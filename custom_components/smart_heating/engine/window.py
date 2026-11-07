@@ -12,14 +12,23 @@ MAX_PAUSE = timedelta(minutes=30)
 
 
 def recent_drop(
-    history: Sequence[SensorReading], now: datetime, period: timedelta
+    history: Sequence[SensorReading],
+    now: datetime,
+    period: timedelta,
+    ceiling: float | None = None,
 ) -> float | None:
-    """How far the latest reading is below the highest one within `period` (None: too few)."""
+    """How far the latest reading is below the highest one within `period` (None: too few).
+
+    With a `ceiling` (the room's comfort temperature) the highest reading counts at most as the ceiling: a room
+    that overshot its comfort temperature and settles back is not a window, only a fall below it is."""
     cutoff = now - period
     recent = [r.value for r in history if cutoff <= r.at <= now]
     if len(recent) < 2:
         return None
-    return max(recent) - recent[-1]
+    peak = max(recent)
+    if ceiling is not None:
+        peak = min(peak, ceiling)
+    return peak - recent[-1]
 
 
 def drop_threshold(room: RoomConfig, inp: EngineInput) -> float:
@@ -35,8 +44,8 @@ def window_history(room: RoomConfig, inp: EngineInput) -> Sequence[SensorReading
     return inp.temp_history.get(room.name, ())
 
 
-def _fast_fall(room: RoomConfig, inp: EngineInput) -> bool:
-    drop = recent_drop(window_history(room, inp), inp.now, room.window_period)
+def _fast_fall(room: RoomConfig, inp: EngineInput, ceiling: float) -> bool:
+    drop = recent_drop(window_history(room, inp), inp.now, room.window_period, ceiling)
     return drop is not None and drop >= drop_threshold(room, inp) - EPSILON
 
 
@@ -49,7 +58,7 @@ def window_pauses(inp: EngineInput) -> dict[str, datetime]:
         until = inp.last_commands.window_paused_until.get(room.name)
         if until is not None and inp.now < until:
             paused[room.name] = until
-        elif _fast_fall(room, inp):
+        elif _fast_fall(room, inp, room.comfort):
             length = min(max(room.window_pause, MIN_PAUSE), MAX_PAUSE)
             paused[room.name] = inp.now + length
     return paused

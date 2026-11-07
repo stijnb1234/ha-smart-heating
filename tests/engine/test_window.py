@@ -126,3 +126,19 @@ def test_default_sensitivity_catches_a_realistic_open_window(clock):
         temp -= 0.06  # 0.9 degC in 15 min, well below the old 1.5 degC / 10 min threshold
         home.step(temp)
     assert home.decision.trv_setpoints["bedroom"] == 12.0
+
+
+def test_settling_back_from_an_overshoot_is_not_a_window(clock):
+    home = Home(clock)  # target 19.5
+    settle(home, temp=21.0)
+    temp = 21.0
+    for _ in range(20):
+        temp -= 0.09  # 1.35 degC in 15 min, but only down to the target
+        assert home.step(temp) == 19.5
+
+
+def test_fall_below_target_after_an_overshoot_still_pauses(clock):
+    home = Home(clock)
+    settle(home, temp=21.0)
+    home.step(19.5)
+    assert home.step(18.5) == 12.0  # 1.0 below the target

@@ -57,9 +57,11 @@ def test_open_window_during_cooldown_is_still_seen_by_the_room_sensor():
     c = make()
     stopped = _heat_then_stop(c)
 
+    # The fall counts from the room's comfort temperature down, so a TRV reading above it
+    # (hot radiator) delays the catch a few minutes; it must still come within 20.
     reasons = _run(
         c,
-        10,
+        20,
         room=lambda m: 20.0 - 0.3 * m,  # the room air cools fast: a real open window
         trv=lambda m: 20.0 + TRV_EXCESS * math.exp(-m / TAU) - 0.3 * m,
         start=stopped,
