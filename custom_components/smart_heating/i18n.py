@@ -53,20 +53,28 @@ HELP: dict[str, list[tuple[str, str]]] = {
             "that should be warm call the boiler.",
         ),
         (
-            "What a room sentence means",
+            "Room sentences: schedule and boost",
             "| You see | Meaning |\n|---|---|\n"
             "| Warm until 17:00 | In a scheduled warm period. |\n"
             "| Warm from 08:00 | Lower temperature now, warms up for the next period. |\n"
             "| Kept at 16 degrees | Lower temperature, nothing scheduled. |\n"
             "| Warming up, warm until 17:00 | Started early so it is warm when the schedule begins. |\n"
-            "| Boost until 14:00 | You pressed Boost. Warm until then or until you cancel. |\n"
-            "| Window seems open, heating paused until 14:20 | It cooled faster than usual for this room, so heating pauses a while. |\n"
+            "| Boost until 14:00 | You pressed Boost. Warm until then or until you cancel. |",
+        ),
+        (
+            "Room sentences: away and vacation",
+            "| You see | Meaning |\n|---|---|\n"
             "| Nobody home, kept at 16 degrees | Nobody is home. Long absence: just above freezing. |\n"
             "| Room's person is away, kept at 16 degrees | The person this room is for is away: schedule skipped. Warms up when they are back or on their way. |\n"
-            "| Waiting for the floor heating to warm up first, kept at 12 degrees | The slow floor heating warms up first. Idle radiators stay closed meanwhile. |\n"
+            "| Vacation until Sat 16:20, kept at 12 degrees | Vacation mode: just above freezing. Each room starts warming up in time for your return. |\n"
+            "| Waiting for the floor heating to warm up first, kept at 12 degrees | The slow floor heating warms up first. Idle radiators stay closed meanwhile. |",
+        ),
+        (
+            "Room sentences: window, sensor and manual",
+            "| You see | Meaning |\n|---|---|\n"
+            "| Window seems open, heating paused until 14:20 | It cooled faster than usual for this room, so heating pauses a while. |\n"
             "| Reached 19.5 degrees, radiator closed | The room sensor reads the target or higher, so the radiator is shut even if the valve's own sensor disagrees. Opens again when the room cools a little. A room without a room sensor never shows this: its valve closes itself and the sentence keeps showing the schedule. |\n"
-            "| Set by hand to 22 degrees, until 17:00 | You turned the valve yourself. Left alone until the room's target changes. The boiler is called if the room is colder than you set. |\n"
-            "| Vacation until Sat 16:20, kept at 12 degrees | Vacation mode: just above freezing. Each room starts warming up in time for your return. |\n\n"
+            "| Set by hand to 22 degrees, until 17:00 | You turned the valve yourself. Left alone until the room's target changes. The boiler is called if the room is colder than you set. |\n\n"
             "Strongest rule wins: Boost, open window, Vacation, nobody home, schedule.",
         ),
         (
@@ -126,20 +134,28 @@ HELP: dict[str, list[tuple[str, str]]] = {
             "ruimtes die warm moeten zijn vragen de boiler om warmte.",
         ),
         (
-            "Wat een zin bij een ruimte betekent",
+            "Zinnen: schema en boost",
             "| Je ziet | Betekenis |\n|---|---|\n"
             "| Warm tot 17:00 | In een geplande warme periode. |\n"
             "| Warm vanaf 08:00 | Nu lagere temperatuur, warmt op voor de volgende periode. |\n"
             "| Op 16 graden gehouden | Lagere temperatuur, niets gepland. |\n"
             "| Opwarmen, warm tot 17:00 | Eerder begonnen, zodat het warm is als het schema start. |\n"
-            "| Boost tot 14:00 | Je drukte op Boost. Warm tot dan of tot je annuleert. |\n"
-            "| Raam lijkt open, verwarming gepauzeerd tot 14:20 | Koelde sneller af dan normaal voor deze ruimte, dus de verwarming pauzeert even. |\n"
+            "| Boost tot 14:00 | Je drukte op Boost. Warm tot dan of tot je annuleert. |",
+        ),
+        (
+            "Zinnen: weg en vakantie",
+            "| Je ziet | Betekenis |\n|---|---|\n"
             "| Niemand thuis, op 16 graden gehouden | Niemand is thuis. Lange afwezigheid: net boven vorst. |\n"
             "| Persoon van deze ruimte is weg, op 16 graden gehouden | De persoon voor wie deze ruimte is, is weg: schema overgeslagen. Warmt op als diegene terug of onderweg is. |\n"
-            "| Wacht tot de vloerverwarming is opgewarmd, op 12 graden gehouden | De trage vloerverwarming warmt eerst op. Ongebruikte radiatoren blijven intussen dicht. |\n"
+            "| Vakantie tot za 16:20, op 12 graden gehouden | Vakantiemodus: net boven vorst. Elke ruimte begint op tijd op te warmen voor je terugkomst. |\n"
+            "| Wacht tot de vloerverwarming is opgewarmd, op 12 graden gehouden | De trage vloerverwarming warmt eerst op. Ongebruikte radiatoren blijven intussen dicht. |",
+        ),
+        (
+            "Zinnen: raam, sensor en handmatig",
+            "| Je ziet | Betekenis |\n|---|---|\n"
+            "| Raam lijkt open, verwarming gepauzeerd tot 14:20 | Koelde sneller af dan normaal voor deze ruimte, dus de verwarming pauzeert even. |\n"
             "| 19,5 graden bereikt, radiator dicht | De kamersensor meldt de doeltemperatuur of meer, dus de radiator gaat dicht, ook als de eigen sensor van de kraan het anders ziet. Gaat weer open als de kamer iets afkoelt. Een kamer zonder kamersensor toont dit nooit: de kraan sluit zelf en de zin blijft het schema tonen. |\n"
-            "| Handmatig ingesteld op 22 graden, tot 17:00 | Je draaide de kraan zelf. Met rust gelaten tot het doel van de ruimte verandert. De boiler wordt gevraagd als de ruimte kouder is dan jouw instelling. |\n"
-            "| Vakantie tot za 16:20, op 12 graden gehouden | Vakantiemodus: net boven vorst. Elke ruimte begint op tijd op te warmen voor je terugkomst. |\n\n"
+            "| Handmatig ingesteld op 22 graden, tot 17:00 | Je draaide de kraan zelf. Met rust gelaten tot het doel van de ruimte verandert. De boiler wordt gevraagd als de ruimte kouder is dan jouw instelling. |\n\n"
             "Sterkste regel wint: Boost, open raam, Vakantie, niemand thuis, schema.",
         ),
         (
@@ -275,6 +291,15 @@ CATALOG: dict[str, dict[str, str]] = {
         "dash.title": "Smart Heating",
         "dash.view.overview": "Overview",
         "dash.view.heating": "Heating",
+        "dash.view.schedule": "Schedule",
+        "dash.schedule.temps": "Warm at {comfort}°, otherwise kept at {setback}°.",
+        "dash.schedule.days": "Days",
+        "dash.schedule.warm": "Warm",
+        "dash.schedule.none": "Not warmed",
+        "dash.schedule.hint": (
+            "Shows the schedule only. Boost, vacation, nobody home and an open window override it, "
+            "and each room starts warming up a little before its warm time. Edit under Configure."
+        ),
         "dash.view.boiler": "Boiler",
         "dash.view.help": "Help",
         "dash.right_now": "Right now",
@@ -417,6 +442,15 @@ CATALOG: dict[str, dict[str, str]] = {
         "dash.title": "Smart Heating",
         "dash.view.overview": "Overzicht",
         "dash.view.heating": "Verwarming",
+        "dash.view.schedule": "Schema",
+        "dash.schedule.temps": "Warm op {comfort}°, anders op {setback}° gehouden.",
+        "dash.schedule.days": "Dagen",
+        "dash.schedule.warm": "Warm",
+        "dash.schedule.none": "Niet verwarmd",
+        "dash.schedule.hint": (
+            "Toont alleen het schema. Boost, vakantie, niemand thuis en een open raam gaan voor, "
+            "en elke ruimte begint iets eerder op te warmen. Aanpassen onder Configureren."
+        ),
         "dash.view.boiler": "Boiler",
         "dash.view.help": "Help",
         "dash.right_now": "Nu",

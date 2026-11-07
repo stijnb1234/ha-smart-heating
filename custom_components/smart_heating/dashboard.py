@@ -11,6 +11,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from .const import DOMAIN
+from .dashboard_schedule import room_schedule_markdown
 from .i18n import DEFAULT_LANGUAGE, help_cards, tr
 from .rooms import room_id, slug
 from .trv_devices import fallback_trv
@@ -189,6 +190,26 @@ def _heating_view(rooms: list[dict[str, Any]], lang: str) -> dict[str, Any]:
     }
 
 
+def _schedule_view(rooms: list[dict[str, Any]], lang: str) -> dict[str, Any]:
+    """Calendar-like weekly overview: when each room is kept warm."""
+    sections = [
+        _section(
+            _heading(r["name"], "mdi:calendar-clock"),
+            {"type": "markdown", "content": room_schedule_markdown(r, lang)},
+        )
+        for r in rooms
+    ]
+    sections.append(_section({"type": "markdown", "content": tr(lang, "dash.schedule.hint")}))
+    return {
+        "title": tr(lang, "dash.view.schedule"),
+        "path": "schedule",
+        "icon": "mdi:calendar-clock",
+        "type": "sections",
+        "max_columns": 2,
+        "sections": sections,
+    }
+
+
 def _boiler_view(lang: str) -> dict[str, Any]:
     call = entity_id("binary_sensor", None, "boiler_call")
     target = entity_id("sensor", None, "boiler_target")
@@ -260,6 +281,7 @@ def build_dashboard(
         "views": [
             _overview_view(room_list, lang),
             _heating_view(room_list, lang),
+            _schedule_view(room_list, lang),
             _boiler_view(lang),
             _help_view(lang),
         ],

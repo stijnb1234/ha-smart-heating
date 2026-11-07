@@ -43,9 +43,9 @@ def test_slug_and_entity_ids():
     assert entity_id("switch", None, "vacation_mode") == "switch.smart_heating_vacation_mode"
 
 
-def test_views_are_overview_heating_boiler_help():
+def test_views_are_overview_heating_schedule_boiler_help():
     assert [v["path"] for v in build_dashboard(ROOMS)["views"]] == [
-        "overview", "heating", "boiler", "help"
+        "overview", "heating", "schedule", "boiler", "help"
     ]
 
 
@@ -193,3 +193,28 @@ def test_valve_card_uses_the_entities_found_on_the_trv_device():
     room = {"name": "Bed", "id": "bed", "trv_entity": "climate.trv", "trv_battery": "sensor.trv_power", "trv_valve_position": None, "trv_heating_demand": None}
     text = to_yaml(build_dashboard([room]))
     assert "sensor.trv_power" in text and "valve_position" not in text
+
+
+def test_schedule_view_groups_days_and_shows_overnight_spill():
+    from custom_components.smart_heating.dashboard_schedule import room_schedule_markdown
+
+    room = {
+        "name": "A",
+        "comfort": 20,
+        "setback": 16,
+        "schedule": [
+            {"days": [0, 1, 2, 3, 4], "start": "07:00", "end": "09:00"},
+            {"days": [4], "start": "22:00", "end": "02:00"},
+        ],
+    }
+    text = room_schedule_markdown(room, "en")
+    assert "Warm at 20°, otherwise kept at 16°." in text
+    assert "**Mon–Thu**" in text and "07:00–09:00" in text
+    assert "07:00–09:00, 22:00–24:00" in text  # Friday
+    assert "00:00–02:00" in text  # Saturday morning
+    assert "Not warmed" in text  # Sunday
+
+
+def test_schedule_view_has_a_section_per_room():
+    sched = view(build_dashboard(ROOMS), "schedule")
+    assert len(sched["sections"]) == len(ROOMS) + 1  # plus the hint

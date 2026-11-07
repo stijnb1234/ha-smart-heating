@@ -37,7 +37,7 @@ def test_dutch_sentences_and_numbers():
 
 
 def test_every_reason_has_a_dutch_sentence_in_the_dutch_help():
-    help_text = str(build_dashboard(["A"], "nl")["views"][3])
+    help_text = str(build_dashboard(["A"], "nl")["views"][-1])
     for reason in get_args(Reason):
         sentence = summarize(Explanation(reason, 16.0, NOW, 19.5), NOW, "nl")
         stem = sentence.split("10:00")[0].split("16 graden")[0].strip(" ,")
@@ -46,7 +46,7 @@ def test_every_reason_has_a_dutch_sentence_in_the_dutch_help():
 
 def test_dutch_dashboard_has_dutch_titles_and_overview_keeps_all_controls():
     d = build_dashboard([{"name": "Werkkamer"}], "nl")
-    assert [v["title"] for v in d["views"]] == ["Overzicht", "Verwarming", "Boiler", "Help"]
+    assert [v["title"] for v in d["views"]] == ["Overzicht", "Verwarming", "Schema", "Boiler", "Help"]
     text = str(d["views"][0])
     for ent in (
         "switch.smart_heating_vacation_mode",
