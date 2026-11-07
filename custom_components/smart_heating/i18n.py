@@ -295,7 +295,7 @@ CATALOG: dict[str, dict[str, str]] = {
         "dash.schedule.temps": "Warm at {comfort}°, otherwise kept at {setback}°.",
         "dash.schedule.days": "Days",
         "dash.schedule.warm": "Warm",
-        "dash.schedule.none": "Not warmed",
+        "dash.schedule.none": "–",
         "dash.schedule.hint": (
             "Shows the schedule only. Boost, vacation, nobody home and an open window override it, "
             "and each room starts warming up a little before its warm time. Edit under Configure."
@@ -446,7 +446,7 @@ CATALOG: dict[str, dict[str, str]] = {
         "dash.schedule.temps": "Warm op {comfort}°, anders op {setback}° gehouden.",
         "dash.schedule.days": "Dagen",
         "dash.schedule.warm": "Warm",
-        "dash.schedule.none": "Niet verwarmd",
+        "dash.schedule.none": "–",
         "dash.schedule.hint": (
             "Toont alleen het schema. Boost, vakantie, niemand thuis en een open raam gaan voor, "
             "en elke ruimte begint iets eerder op te warmen. Aanpassen onder Configureren."

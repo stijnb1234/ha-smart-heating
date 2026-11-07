@@ -207,12 +207,12 @@ def test_schedule_view_groups_days_and_shows_overnight_spill():
             {"days": [4], "start": "22:00", "end": "02:00"},
         ],
     }
-    text = room_schedule_markdown(room, "en")
+    text = room_schedule_markdown(room, "en").replace("\u00a0", "").replace("\u2060", "")
     assert "Warm at 20°, otherwise kept at 16°." in text
     assert "**Mon–Thu**" in text and "07:00–09:00" in text
     assert "07:00–09:00, 22:00–24:00" in text  # Friday
     assert "00:00–02:00" in text  # Saturday morning
-    assert "Not warmed" in text  # Sunday
+    assert "| **Sun** |" in text  # Sunday
 
 
 def test_schedule_view_has_a_section_per_room():

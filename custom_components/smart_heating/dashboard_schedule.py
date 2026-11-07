@@ -13,9 +13,10 @@ from .engine import DEFAULT_COMFORT, DEFAULT_SETBACK
 from .i18n import number, tr, weekday
 
 DAY_MINUTES = 24 * 60
-STEP = 30  # one bar cell = 30 minutes
+STEP = 60  # one bar cell = one hour, filled when warm for at least half of it
 CELLS = DAY_MINUTES // STEP
 WARM, COLD = "█", "·"
+NBSP, WJ = "\u00a0", "\u2060"  # keep a time range and a day range on one line
 
 Intervals = tuple[tuple[int, int], ...]
 
@@ -58,12 +59,10 @@ def _bar(spans: Intervals) -> str:
     cells = []
     for i in range(CELLS):
         lo, hi = i * STEP, (i + 1) * STEP
-        cells.append(WARM if any(s < hi and e > lo for s, e in spans) else COLD)
-    return "".join(cells)
-
-
-def _ruler() -> str:
-    return "".join(f"{h:02d}    " for h in range(0, 24, 3))
+        warm = sum(max(0, min(e, hi) - max(s, lo)) for s, e in spans)
+        cells.append(WARM if warm * 2 >= STEP else COLD)
+    # A divider every six hours (00, 06, 12, 18).
+    return "│".join("".join(cells[i : i + 6]) for i in range(0, CELLS, 6))
 
 
 def _groups(week: list[Intervals]) -> list[tuple[list[int], Intervals]]:
@@ -85,12 +84,12 @@ def room_schedule_markdown(room: Mapping[str, Any], lang: str) -> str:
     lines = [
         t("dash.schedule.temps", comfort=number(comfort, lang), setback=number(setback, lang)),
         "",
-        f"| {t('dash.schedule.days')} | `{_ruler()}` | {t('dash.schedule.warm')} |",
+        f"| {t('dash.schedule.days')} | `00:00 → 24:00` | {t('dash.schedule.warm')} |",
         "|---|---|---|",
     ]
     for days, spans in _groups(week):
         first, last = days[0], days[-1]
-        label = weekday(lang, first) if first == last else f"{weekday(lang, first)}–{weekday(lang, last)}"
-        times = ", ".join(f"{_clock(s)}–{_clock(e)}" for s, e in spans) or t("dash.schedule.none")
+        label = weekday(lang, first) if first == last else f"{weekday(lang, first)}{WJ}–{WJ}{weekday(lang, last)}"
+        times = ", ".join(f"{_clock(s)}{NBSP}–{NBSP}{_clock(e)}" for s, e in spans) or t("dash.schedule.none")
         lines.append(f"| **{label}** | `{_bar(spans)}` | {times} |")
     return "\n".join(lines)
