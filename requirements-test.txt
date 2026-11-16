@@ -1,4 +1,4 @@
 # Test and lint tooling. pytest-homeassistant-custom-component pins a matching Home Assistant.
 pytest-homeassistant-custom-component==0.13.316
 ruff==0.17.2
-mypy==2.4.0
+mypy==2.4.1
