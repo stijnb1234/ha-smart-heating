@@ -1,11 +1,11 @@
 # Smart Heating
 
-[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=stijnb1234&repository=ha-smart-thermostat&category=integration)
-[![Validate](https://github.com/stijnb1234/ha-smart-thermostat/actions/workflows/validate.yml/badge.svg)](https://github.com/stijnb1234/ha-smart-thermostat/actions/workflows/validate.yml)
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=stijnb1234&repository=ha-smart-heating&category=integration)
+[![Validate](https://github.com/stijnb1234/ha-smart-heating/actions/workflows/validate.yml/badge.svg)](https://github.com/stijnb1234/ha-smart-heating/actions/workflows/validate.yml)
 
 Room-by-room heating for Home Assistant. One boiler, several radiators: the boiler fires only when a room actually wants heat, and rooms nobody uses stay cool.
 
-**Living with it?** The user manual explains the Overview screen, the buttons and what each message means, without the technical details: [English](https://github.com/stijnb1234/ha-smart-thermostat/blob/main/docs/manual.en.md) · [Nederlands](https://github.com/stijnb1234/ha-smart-thermostat/blob/main/docs/manual.nl.md).
+**Living with it?** The user manual explains the Overview screen, the buttons and what each message means, without the technical details: [English](https://github.com/stijnb1234/ha-smart-heating/blob/main/docs/manual.en.md) · [Nederlands](https://github.com/stijnb1234/ha-smart-heating/blob/main/docs/manual.nl.md).
 
 ## Features
 
@@ -63,7 +63,7 @@ Not controlled: the floor loops themselves (floor heating only calls the boiler)
 Via HACS (custom repository), or click the badge above:
 
 1. HACS → ⋮ → **Custom repositories**.
-2. Repository: `https://github.com/stijnb1234/ha-smart-thermostat`, category **Integration** → **Add**.
+2. Repository: `https://github.com/stijnb1234/ha-smart-heating`, category **Integration** → **Add**.
 3. Find **Smart Heating** in HACS → **Download**.
 4. Restart Home Assistant.
 5. Settings → Devices & services → **Add integration** → **Smart Heating**.
@@ -97,7 +97,7 @@ On setup the integration writes `smart_heating_dashboard.yaml` into your config 
 
 | Page | Contents |
 |---|---|
-| Overview | Status line, a table of all rooms, alerts when there are any, all controls. The [manual](https://github.com/stijnb1234/ha-smart-thermostat/blob/main/docs/manual.en.md) covers this page for everyday users. |
+| Overview | Status line, a table of all rooms, alerts when there are any, all controls. The [manual](https://github.com/stijnb1234/ha-smart-heating/blob/main/docs/manual.en.md) covers this page for everyday users. |
 | Heating | One section per room: summary, next change, lead time, Boost, a 24 h temperature graph and the valve's battery, opening and heating demand (found on the valve's device). |
 | Boiler | Call status, demand rooms, last write and its result, backoff, boiler thermostat manual hold, Manual-room override. |
 | Help | Short cards on how to read the dashboard. |
@@ -157,7 +157,7 @@ Cloud and Zigbee timing could not be measured, so defaults were assumed and are 
 - *Boiler never fires*: check the boiler thermostat is set under *Boiler, presence and vacation* and its integration can write setpoints; look for `boiler_outage` / rate-limit alerts.
 - *Room ignores external sensor*: readings older than 60 min fall back to the TRV sensor plus offset; a sensor silent for 2 h raises an alert. Check the diagnostics (below) for whether the valve takes an external temperature at all.
 - *Window pause when nothing was open*: the log line `Open window in <room>: … K drop` shows the drop and which sensor saw it.
-- Otherwise, open an [issue](https://github.com/stijnb1234/ha-smart-thermostat/issues) with the diagnostics (Settings → Devices & services → Smart Heating → ⋮ → **Download diagnostics**; people and calendars are redacted, locations never included) and debug logs (`custom_components.smart_heating: debug`).
+- Otherwise, open an [issue](https://github.com/stijnb1234/ha-smart-heating/issues) with the diagnostics (Settings → Devices & services → Smart Heating → ⋮ → **Download diagnostics**; people and calendars are redacted, locations never included) and debug logs (`custom_components.smart_heating: debug`).
 
 ## Development
 

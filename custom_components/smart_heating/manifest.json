@@ -4,10 +4,10 @@
   "after_dependencies": ["frontend", "lovelace", "mqtt", "recorder"],
   "codeowners": ["@stijnb1234"],
   "config_flow": true,
-  "documentation": "https://github.com/stijnb1234/ha-smart-thermostat",
+  "documentation": "https://github.com/stijnb1234/ha-smart-heating",
   "integration_type": "service",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/stijnb1234/ha-smart-thermostat/issues",
+  "issue_tracker": "https://github.com/stijnb1234/ha-smart-heating/issues",
   "requirements": [],
   "version": "2.1.2"
 }
