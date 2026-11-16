@@ -1,0 +1,35 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you see instead? Name the room if it concerns one.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Smart Heating, Home Assistant and (if relevant) Zigbee2MQTT versions.
+      placeholder: "Smart Heating 2.1.2, Home Assistant 2026.11.0"
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware
+      description: Which TRV model and boiler thermostat, and how are they connected?
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: "Settings → Devices & services → Smart Heating → ⋮ → Download diagnostics. Drag the file here. People and calendars are redacted, locations are never included."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "Relevant lines, ideally with `custom_components.smart_heating: debug`. For an open-window pause include the `Open window in …` line."
+      render: text
