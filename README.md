@@ -27,7 +27,7 @@ Room-by-room heating for Home Assistant. One boiler, several radiators: the boil
 
 **Automatic behaviour**
 
-- **Open-window detection**: a fast temperature drop (read from the TRV sensor, which sits nearest the window) pauses a room for 15–30 min. While a radiator cools down after heating, the TRV sensor falls although the room does not; for that hour only the external room sensor counts. The configured drop is a ceiling: each room learns its own normal fluctuation and uses a lower, tighter threshold once it has about 3 hours of quiet data.
+- **Open-window detection**: a fast temperature drop (read from the TRV sensor, which sits nearest the window) pauses a room for 15–30 min. While a radiator cools down after heating, the TRV sensor falls although the room does not; for that hour only the external room sensor counts. The TRV's own valve counts too: for an hour after it reports a closed valve, only the room sensor counts. Readings are timed by when the sensor reported them, so a value that arrives after a long silence is not a fast fall. A TRV reading counts as fresh for 6 hours: battery TRVs report when the temperature changes, so a quiet room is a quiet TRV, and an available TRV that has reported within those 6 hours is not offline either. Without valve information, a room with an external sensor only pauses when the room sensor falls along (at least three quarters of the threshold, minimum 0.3 °C): a TRV sensor that swings on its own is not a window. The configured drop is a ceiling: each room learns its own normal fluctuation and uses a lower, tighter threshold once it has about 3 hours of quiet data.
 - **Self-learning** (persisted, per room, with safe fallbacks until there is data):
   - *Coast*: how far a room keeps rising after the boiler call ends (upper quartile of recent observations); the call then ends that much earlier to avoid overshoot. While the room is still warming from the radiator's stored heat it does not call again, unless it is clearly cold.
   - *Sensor offset*: the difference between the external sensor and the TRV sensor while the radiator is idle, used when only the TRV reading is available (unless an offset is set by hand).
@@ -35,7 +35,7 @@ Room-by-room heating for Home Assistant. One boiler, several radiators: the boil
   - *Schedule suggestions*: Boosts and hand-set valves on at least 3 different days around the same time outside the schedule show up in the Monday report as a suggested schedule window. Nothing changes by itself.
 - **Hand changes are respected** (and survive restarts):
   - A temperature set on a radiator valve stays until that room's target next changes. It calls the boiler if it is above the room's setback and the room is colder than that.
-  - A TRV that never took the temperature we sent gets it again, up to 3 times, then raises an alert.
+  - A TRV that never took the temperature we sent gets it again, up to 3 times, then raises an alert and keeps trying every 30 min. A TRV whose entity is unavailable for longer than the offline limit is out of reach: it uses up no retries and raises no such alert (the offline alert covers it), and the write is retried as soon as it reports again.
   - A change on the boiler thermostat is respected for 2 hours (configurable under advanced settings). If what you set is what Smart Heating wants anyway when that ends, it is simply adopted.
 
 **Controls and insight**

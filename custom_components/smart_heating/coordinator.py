@@ -34,7 +34,7 @@ from .const import (
     UPDATE_INTERVAL_SECONDS,
 )
 from .controller import Controller, Cycle, Snapshot
-from .engine import Commands, SensorReading
+from .engine import Commands, SensorConfig, SensorReading
 from .engine.window import recent_drop, window_history
 from .gather import battery_is_low, parse_number
 from .presence_adapter import PresenceAdapter, is_arriving
@@ -63,6 +63,11 @@ CALENDAR_LOOKAHEAD = timedelta(days=120)
 # Heading home counts once the ETA is within the longest lead time, but at least this.
 MIN_ARRIVAL_HORIZON = timedelta(minutes=30)
 DEFAULT_ARRIVAL_HORIZON = timedelta(minutes=70)
+
+
+def _trace(history, now: datetime) -> str:
+    """Readings as `value (minutes ago)`, for the log."""
+    return ", ".join(f"{r.value:.1f} ({(now - r.at).total_seconds() / 60:.0f}m)" for r in history) or "none"
 
 
 def _reported_at(state: State) -> datetime:
@@ -162,12 +167,25 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
             return DEFAULT_ARRIVAL_HORIZON
         return max(MIN_ARRIVAL_HORIZON, *self.data.lead_times.values())
 
+    def _valve_text(self, room: str) -> str:
+        device = self.trv_devices.get(room)
+        if device is None:
+            return "unknown"
+        parts = []
+        for label, entity in (("position", device.valve_position), ("demand", device.heating_demand)):
+            state = self.hass.states.get(entity) if entity else None
+            if state is not None:
+                parts.append(f"{label} {state.state}")
+        return ", ".join(parts) or "unknown"
+
     def _snapshot(self) -> Snapshot:
         # Local time: schedule windows are wall-clock times, the engine reads them off `now`.
         now = dt_util.now()
         external: dict[str, SensorReading] = {}
         trv: dict[str, SensorReading] = {}
         battery: dict[str, bool] = {}
+        valve_open: set[str] = set()
+        valve_known: set[str] = set()
         sensors = self._shared["sensor_entities"]
         # Floor-heating and open-radiator rooms have a sensor but no TRV.
         for room in [*self.trv_devices, *(r for r in sensors if r not in self.trv_devices)]:
@@ -182,8 +200,19 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
                 trv[room] = r
             state = self.hass.states.get(device.climate)
             if state is not None and state.state not in _UNAVAILABLE:
-                self._last_seen[room] = _reported_at(state)
+                reported = _reported_at(state)
+                # Report-on-change TRVs go quiet while the room is stable: an available entity that
+                # reported within the trusted period is alive, so only unavailability or a long silence
+                # counts as offline.
+                alive = now - reported < SensorConfig().trv_stale_after
+                self._last_seen[room] = now if alive else reported
             self._last_seen.setdefault(room, now)  # grace period at startup
+            for entity in (device.valve_position, device.heating_demand):
+                value = parse_number(s.state) if (s := self.hass.states.get(entity) if entity else None) else None
+                if value is not None:
+                    valve_known.add(room)
+                    if value > 0:
+                        valve_open.add(room)
             bat = self.hass.states.get(device.battery) if device.battery else None
             battery[room] = bat is not None and battery_is_low(bat.state, self._battery_low_percent)
         self.presence.update(self._arrival_horizon())
@@ -209,6 +238,8 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
             boiler_observed=self._boiler.observed_setpoint if self._boiler else None,
             absent_rooms=self._absent_rooms(now),
             trv_off=self._trv.stuck_off(),
+            valve_open=frozenset(valve_open),
+            valve_known=frozenset(valve_known),
             trv_without_external=frozenset(
                 room for room in self.trv_devices if not self._trv.takes_external_temperature(room)
             ),
@@ -337,11 +368,15 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
             cooling = name in cycle.inp.cooling_rooms
             drop = recent_drop(window_history(cfg, cycle.inp), cycle.inp.now, cfg.window_period)
             _LOGGER.info(
-                "Open window in %s: %.1f K drop within %s min (%s sensor); pausing until %s",
+                "Open window in %s: %.1f K drop within %s min (%s sensor); pausing until %s. "
+                "Room sensor: %s. TRV sensor: %s. Valve: %s",
                 name,
                 drop or 0.0,
                 int(cfg.window_period.total_seconds() // 60),
                 "external, radiator cooling" if cooling else "TRV-first",
                 decision.window_paused_until[name],
+                _trace(cycle.inp.external_history.get(name, ()), cycle.inp.now),
+                _trace(cycle.inp.temp_history.get(name, ()), cycle.inp.now),
+                self._valve_text(name),
             )
         self._prev_manual, self._prev_hold, self._prev_paused = manual, hold, paused

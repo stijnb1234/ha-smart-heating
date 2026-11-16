@@ -78,7 +78,41 @@ def test_open_window_after_cooldown_is_seen_by_the_trv_sensor():
     assert "window" not in quiet
 
     reasons = _run(
-        c, 10, room=lambda m: 20.0, trv=lambda m: cooled - 0.3 * m, start=stopped + timedelta(minutes=90)
-    )
+        c, 10, room=lambda m: 20.0 - 0.07 * m, trv=lambda m: cooled - 0.3 * m, start=stopped + timedelta(minutes=90)
+    )  # the TRV sensor reacts first, the room sensor follows
 
     assert "window" in reasons
+
+
+def test_a_closing_valve_starts_the_cooldown_without_any_boiler_call():
+    c = make()
+    for m in range(20):  # valve open, but the boiler is not calling (room within its band)
+        now = START + timedelta(minutes=m)
+        cycle = c.step(snap(now, temp=23.0, ext=19.95, valve_open=frozenset({"work"})))
+        c.confirm(cycle, dict(cycle.decision.trv_setpoints), Commands())
+    reasons = []
+    for m in range(20, 50):  # valve shut: the TRV sensor falls fast, the room does not
+        now = START + timedelta(minutes=m)
+        cycle = c.step(snap(now, temp=23.0 - 0.2 * (m - 20), ext=19.95))
+        c.confirm(cycle, dict(cycle.decision.trv_setpoints), Commands())
+        reasons.append(cycle.decision.reasons["work"])
+
+    assert "window" not in reasons
+
+
+def test_a_value_after_a_long_silence_is_not_a_fast_fall():
+    from custom_components.smart_heating.engine import SensorReading
+
+    c = make()
+    reported = START
+    for m in range(61):  # the TRV reports once an hour: 20.0, then 19.0
+        now = START + timedelta(minutes=m)
+        if m == 60:
+            reported = now
+        value = 19.0 if m == 60 else 20.0
+        s = snap(now)
+        s = type(s)(**{**s.__dict__, "trv": {"work": SensorReading(value, START if m < 60 else reported)}})
+        cycle = c.step(s)
+        c.confirm(cycle, dict(cycle.decision.trv_setpoints), Commands())
+
+    assert cycle.decision.reasons["work"] != "window"

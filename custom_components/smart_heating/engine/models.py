@@ -70,7 +70,8 @@ class SensorConfig:
     """Staleness and push defaults from docs/research/phase0-findings.md."""
 
     external_stale_after: timedelta = timedelta(minutes=60)
-    trv_stale_after: timedelta = timedelta(minutes=30)
+    # A battery TRV reports when its temperature changes, so a quiet room means a quiet TRV.
+    trv_stale_after: timedelta = timedelta(hours=6)
     push_threshold: float = 0.3
     push_max_interval: timedelta = timedelta(minutes=15)
 
@@ -193,6 +194,8 @@ class EngineInput:
     # Rooms whose radiator is cooling down after heating: their TRV sensor falls although the
     # Room does not, so window detection only trusts the external sensor there.
     cooling_rooms: frozenset[str] = frozenset()
+    # Rooms whose TRV reports its valve or heating demand: its sensor is then judged by the valve state.
+    valve_known: frozenset[str] = frozenset()
     # Learned per Room (see insights.py): open-window drop, extra rise after a call ends, and
     # external-minus-TRV sensor offset. Missing while there is too little data.
     window_thresholds: Mapping[str, float] = field(default_factory=dict)

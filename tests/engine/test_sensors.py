@@ -128,9 +128,9 @@ def test_nothing_pushed_when_external_reading_is_stale(clock):
     assert decision.external_temp_pushes == {}
 
 
-def test_trv_reading_older_than_thirty_minutes_is_stale(clock):
-    fresh = decide(make_input(clock, trv_temps={"living": reading(clock, 20.0, age_min=29)}))
-    stale = decide(make_input(clock, trv_temps={"living": reading(clock, 20.0, age_min=31)}))
+def test_trv_reading_older_than_six_hours_is_stale(clock):
+    fresh = decide(make_input(clock, trv_temps={"living": reading(clock, 20.0, age_min=359)}))
+    stale = decide(make_input(clock, trv_temps={"living": reading(clock, 20.0, age_min=361)}))
 
     assert fresh.room_temps == {"living": 18.5}
     assert stale.room_temps == {}

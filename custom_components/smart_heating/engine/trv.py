@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import timedelta
 
 from .models import Alert, EngineInput
 
 TOLERANCE = 0.05
 MAX_RETRIES = 3
+# After MAX_RETRIES the alert is raised, but the write is still tried now and then: a TRV that
+# was only out of reach for a while takes it as soon as it is back.
+SLOW_RETRY = timedelta(minutes=30)
 
 
 @dataclass(frozen=True)
@@ -23,11 +27,19 @@ def _same(a: float, b: float) -> bool:
     return abs(a - b) <= TOLERANCE
 
 
+def _unreachable(inp: EngineInput, room: str) -> bool:
+    """The TRV counts as gone (see `trv_last_seen`: an available, recently reporting TRV is seen now)."""
+    seen = inp.trv_last_seen.get(room)
+    return seen is not None and inp.now - seen > inp.config.alerts.trv_offline_after
+
+
 def check_trvs(inp: EngineInput, targets: Mapping[str, float]) -> TrvCheck:
     """Decide per Room: rewrite a lost write, leave a hand-set TRV alone, or do nothing.
 
     Only Rooms whose written setpoint is still the target are examined; when the target
-    changes the normal write happens and retry/manual state starts over.
+    changes the normal write happens and retry/manual state starts over. A TRV that is out of
+    reach neither uses up retries nor raises "does not accept": its last reported setpoint is
+    just old news, and the offline alert covers it.
     """
     cmds, now = inp.last_commands, inp.now
     rewrite: set[str] = set()
@@ -48,6 +60,12 @@ def check_trvs(inp: EngineInput, targets: Mapping[str, float]) -> TrvCheck:
             continue
         if _same(observed, written):
             continue  # landed: manual/retry state and alert clear
+        if _unreachable(inp, room):
+            if room in cmds.trv_manual:
+                manual[room] = cmds.trv_manual[room]
+            if room in cmds.trv_retries:
+                retries[room] = cmds.trv_retries[room]
+            continue
         if room in cmds.trv_manual:
             manual[room] = cmds.trv_manual[room]
             continue
@@ -66,6 +84,8 @@ def check_trvs(inp: EngineInput, targets: Mapping[str, float]) -> TrvCheck:
             rewrite.add(room)
             retries[room] = used + 1
         else:
+            if now - written_at >= SLOW_RETRY:
+                rewrite.add(room)
             alerts.append(
                 Alert("trv_write_failed", room, f"TRV in {room} does not accept its setpoint of {target}")
             )

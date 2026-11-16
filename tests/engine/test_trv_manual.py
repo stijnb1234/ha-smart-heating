@@ -156,3 +156,26 @@ def test_trv_off_alert():
         learned={}, last_commands=Commands(), trv_off=frozenset({"office"}),
     )
     assert [a.code for a in compute_alerts(inp)] == ["trv_off"]
+
+
+def test_unreachable_trv_keeps_retries_and_raises_no_write_alert(clock):
+    inp = make(clock, OLD, retries=3)
+    inp = replace(inp, trv_last_seen={"office": clock.now() - timedelta(hours=2)})
+    d = decide(inp)
+
+    assert not d.trv_rewrite and d.trv_retries == {"office": 3}
+    assert "trv_write_failed" not in codes(d)
+
+
+def test_unreachable_trv_is_not_taken_for_hand_set(clock):
+    inp = make(clock, 22.0)
+    inp = replace(inp, trv_last_seen={"office": clock.now() - timedelta(hours=2)})
+
+    assert not decide(inp).trv_manual
+
+
+def test_exhausted_retries_are_tried_again_slowly(clock):
+    d = decide(make(clock, OLD, retries=3, written_ago=35))
+    assert d.trv_rewrite == frozenset({"office"}) and "trv_write_failed" in codes(d)
+
+    assert not decide(make(clock, OLD, retries=3, written_ago=20)).trv_rewrite

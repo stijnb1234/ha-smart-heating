@@ -32,6 +32,26 @@ def select_temperature(
     return None, False
 
 
+def select_window_reading(
+    room: RoomConfig,
+    external: Mapping[str, SensorReading],
+    trv: Mapping[str, SensorReading],
+    now: datetime,
+    cfg: SensorConfig,
+) -> SensorReading | None:
+    """The reading open-window detection follows: the TRV sensor first, as it usually sits by the
+    window and reacts sooner; otherwise the Room temperature. Only changes matter, so no offset.
+    It keeps the time the sensor reported, so a value that only arrives after a long silence
+    is not mistaken for a fast fall."""
+    reading = trv.get(room.name)
+    if reading is not None and now - reading.at < cfg.trv_stale_after:
+        return reading
+    ext = external.get(room.name)
+    if ext is not None and now - ext.at < cfg.external_stale_after:
+        return ext
+    return None
+
+
 def select_window_temperature(
     room: RoomConfig,
     external: Mapping[str, SensorReading],

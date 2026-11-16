@@ -9,6 +9,11 @@ from .models import EPSILON, EngineInput, RoomConfig, SensorReading
 
 MIN_PAUSE = timedelta(minutes=15)
 MAX_PAUSE = timedelta(minutes=30)
+# The TRV sensor sits on the radiator and swings by degrees without the room changing. A TRV that
+# reports its valve is judged by that. Otherwise, with a room sensor on top, a fast fall there must show in the room too: at least this share of the
+# threshold (two steps of a sensor that reports in 0.5 K steps), but not less than MIN_CORROBORATION K.
+CORROBORATION = 0.75
+MIN_CORROBORATION = 0.3
 
 
 def recent_drop(
@@ -45,8 +50,16 @@ def window_history(room: RoomConfig, inp: EngineInput) -> Sequence[SensorReading
 
 
 def _fast_fall(room: RoomConfig, inp: EngineInput, ceiling: float) -> bool:
+    threshold = drop_threshold(room, inp)
     drop = recent_drop(window_history(room, inp), inp.now, room.window_period, ceiling)
-    return drop is not None and drop >= drop_threshold(room, inp) - EPSILON
+    if drop is None or drop < threshold - EPSILON:
+        return False
+    if room.name in inp.cooling_rooms or room.name in inp.valve_known:
+        return True  # judged by the room sensor alone, or the valve state already explains the TRV sensor
+    room_drop = recent_drop(inp.external_history.get(room.name, ()), inp.now, room.window_period, ceiling)
+    if room_drop is None:
+        return True  # no room sensor to check against
+    return room_drop >= max(threshold * CORROBORATION, MIN_CORROBORATION) - EPSILON
 
 
 def window_pauses(inp: EngineInput) -> dict[str, datetime]:

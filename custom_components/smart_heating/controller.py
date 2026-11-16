@@ -23,7 +23,6 @@ from .engine import (
     WriteResult,
     decide,
     select_temperature,
-    select_window_temperature,
     track_unmet,
     wants_comfort,
 )
@@ -31,6 +30,7 @@ from .engine.boiler import demand_margins, wanted_targets
 from .engine.insights import RoomInsights, Suggestion
 from .engine.learner import LeadTimeLearner
 from .engine.overrides import manual_override_active
+from .engine.sensors import select_window_reading
 from .engine.trackers import CoastTracker, RadiatorCooldown, StallTracker
 from .engine.window import drop_threshold, recent_drop, window_history
 from .explain import Explanation, explain
@@ -62,6 +62,8 @@ class Snapshot:
     absent_rooms: frozenset[str] = frozenset()
     trv_off: frozenset[str] = frozenset()
     trv_without_external: frozenset[str] = frozenset()
+    valve_known: frozenset[str] = frozenset()
+    valve_open: frozenset[str] = frozenset()  # Rooms whose TRV reports an open valve or heating demand
 
 
 @dataclass(frozen=True)
@@ -88,6 +90,7 @@ class Controller:
         self._coast = CoastTracker()
         self._stall = StallTracker()
         self._cooldown = RadiatorCooldown()
+        self._valve_cooldown = RadiatorCooldown()
         self._seen_boosts: dict[str, datetime] | None = None
         self._prev_hand: frozenset[str] = frozenset()
         self._last_sample: datetime | None = None
@@ -168,19 +171,24 @@ class Controller:
     def _record_history(self, snap: Snapshot) -> None:
         cfg = self._config.sensors
         for room in self._config.rooms:
-            value = select_window_temperature(room, snap.external, snap.trv, snap.now, cfg)
-            if value is not None:
-                self._history[room.name] = update_history(
-                    self._history.get(room.name, ()), SensorReading(value, snap.now), snap.now, HISTORY_KEEP
-                )
+            reading = select_window_reading(room, snap.external, snap.trv, snap.now, cfg)
+            if reading is not None:
+                self._remember(self._history, room.name, reading, snap.now)
             ext = snap.external.get(room.name)
             if ext is not None and snap.now - ext.at < cfg.external_stale_after:
-                self._external_history[room.name] = update_history(
-                    self._external_history.get(room.name, ()),
-                    SensorReading(ext.value, snap.now),
-                    snap.now,
-                    HISTORY_KEEP,
-                )
+                self._remember(self._external_history, room.name, ext, snap.now)
+
+    @staticmethod
+    def _remember(
+        history: dict[str, tuple[SensorReading, ...]], room: str, reading: SensorReading, now: datetime
+    ) -> None:
+        """Add a reading by the time the sensor reported it, once: a value that sat unchanged for
+        an hour and then jumps is one point, not a fall within the last cycles."""
+        last = history.get(room, ())
+        if last and reading.at <= last[-1].at:
+            history[room] = tuple(r for r in last if now - r.at <= HISTORY_KEEP)
+            return
+        history[room] = update_history(last, reading, now, HISTORY_KEEP)
 
     def step(self, snap: Snapshot) -> Cycle:
         self._record_history(snap)
@@ -210,7 +218,7 @@ class Controller:
             vacation_until=snap.vacation_until,
             temp_history=dict(self._history),
             external_history=dict(self._external_history),
-            cooling_rooms=self._cooldown.cooling(snap.now),
+            cooling_rooms=self._cooldown.cooling(snap.now) | self._valve_cooldown.cooling(snap.now),
             window_thresholds={
                 r.name: t
                 for r in rooms
@@ -221,6 +229,7 @@ class Controller:
             learned_offsets=offsets,
             stalled=self._stall.stalled(snap.now),
             trv_without_external=snap.trv_without_external,
+            valve_known=snap.valve_known,
         )
         decision = decide(inp)
         self._last = (decision, inp.coast)
@@ -300,9 +309,9 @@ class Controller:
                 ins.record_offset(name, ext.value - trv.value)
                 self.insights_dirty = True
         self._record_wishes(snap, decision)
-        self._observe_radiators(now, decision)
+        self._observe_radiators(now, decision, snap.valve_open)
 
-    def _observe_radiators(self, now: datetime, decision: Decision) -> None:
+    def _observe_radiators(self, now: datetime, decision: Decision, valve_open: frozenset[str]) -> None:
         """A radiator is hot while the boiler runs and its Room is below target (valve open)."""
         boiler_on = bool(decision.demand_rooms) or manual_override_active(self._overrides, now)
         for room in self._config.rooms:
@@ -310,6 +319,8 @@ class Controller:
             temp = decision.room_temps.get(name)
             target = decision.hand_set.get(name, decision.trv_setpoints[name])
             self._cooldown.observe(name, now, boiler_on and temp is not None and temp < target)
+            # The TRV itself says when its valve closes: the radiator then cools whatever the boiler did.
+            self._valve_cooldown.observe(name, now, name in valve_open)
 
     def _record_wishes(self, snap: Snapshot, decision: Decision) -> None:
         """Boosts and hand-set TRVs are wishes for warmth: input for schedule suggestions."""
