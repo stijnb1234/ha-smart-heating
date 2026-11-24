@@ -28,3 +28,5 @@ set_vacation:
         datetime:
 
 cancel_vacation:
+
+cancel_boiler_hold:

@@ -261,3 +261,32 @@ def test_lead_time_is_kept_once_pre_heat_started():
     later = c.step(snap(start + timedelta(minutes=30), temp=17.0))
     assert later.decision.reasons["work"] == "pre_heat"
     assert later.lead_times["work"] == timedelta(hours=3)
+
+
+def _held_by_hand(c, hold_left=timedelta(minutes=90)):
+    """We wrote 10 to the boiler thermostat long ago; someone set 18 by hand, now on hold."""
+    c.restore(
+        Commands(
+            boiler_setpoint=10.0,
+            boiler_changed_at=T0 - timedelta(hours=1),
+            boiler_hold_until=T0 + hold_left,
+        )
+    )
+
+
+def test_ending_the_boiler_hold_writes_the_wanted_setpoint_without_a_new_hold():
+    c = make()
+    _held_by_hand(c)
+    assert c.step(snap(T0, boiler_observed=18.0)).decision.boiler_setpoint == 10.0  # hold respected
+    assert c.end_boiler_hold(T0)
+    cycle = c.step(snap(T0, boiler_observed=18.0))
+    assert cycle.decision.boiler_setpoint == 10.0 and cycle.decision.boiler_reassert
+    assert cycle.decision.boiler_hold_until is None
+
+
+def test_ending_the_boiler_hold_without_one_does_nothing():
+    c = make()
+    assert not c.end_boiler_hold(T0)
+    _held_by_hand(c, hold_left=timedelta(minutes=-1))  # already ran out
+    assert not c.end_boiler_hold(T0)
+    assert c.commands.boiler_hold_until == T0 - timedelta(minutes=1)

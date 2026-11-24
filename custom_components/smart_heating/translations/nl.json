@@ -183,6 +183,10 @@
     "cancel_vacation": {
       "name": "Vakantie stoppen",
       "description": "Beëindig een handmatige vakantie (agendavakanties volgen de agenda)."
+    },
+    "cancel_boiler_hold": {
+      "name": "Handmatige wijziging ketelthermostaat beëindigen",
+      "description": "Respecteer een met de hand ingestelde temperatuur op de ketelthermostaat niet langer, zodat Smart Heating de ketel weer aanstuurt."
     }
   },
   "exceptions": {

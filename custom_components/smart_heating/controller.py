@@ -9,7 +9,7 @@ No Home Assistant imports.
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 
 from .engine import (
@@ -120,6 +120,19 @@ class Controller:
         """Resume bookkeeping saved before a restart (manual changes, holds, retries, absence)."""
         self._commands = commands
         self._away_since = away_since
+
+    def end_boiler_hold(self, now: datetime) -> bool:
+        """End a running manual hold on the boiler thermostat now; False when none runs.
+
+        The hold is moved to `now` rather than cleared, so the next cycle treats it as a hold
+        that just ran out: it writes the wanted setpoint (or adopts the hand-set one) instead of
+        seeing the hand-set value as a fresh manual change and starting a new hold.
+        """
+        hold = self._commands.boiler_hold_until
+        if hold is None or hold <= now:
+            return False
+        self._commands = replace(self._commands, boiler_hold_until=now)
+        return True
 
     def _track_away(self, snap: Snapshot) -> datetime | None:
         """Away counts from the moment nobody is home; moving between zones does not reset it."""

@@ -1,4 +1,5 @@
-"""Thin HA glue: Boost and cancel-Boost buttons per Room, and Manual-room override start/cancel buttons.
+"""Thin HA glue: Boost and cancel-Boost buttons per Room, Manual-room override start/cancel buttons,
+and a button to end a manual hold on the boiler thermostat early.
 
 Pressing a button records a start time and the configured duration in the entry's shared
 `boosts` / `manual_overrides` dicts; the coordinator passes those to the engine,
@@ -7,10 +8,12 @@ which decides when they expire.
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.const import EntityCategory
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
@@ -22,6 +25,8 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+_LOGGER = logging.getLogger(__name__)
 
 MANUAL_OVERRIDE_KEY = "manual_room"
 
@@ -82,6 +87,31 @@ class ManualRoomOverrideButton(ButtonEntity):
         await _refresh(self._state)
 
 
+class CancelBoilerHoldButton(ButtonEntity):
+    """Ends a manual hold on the boiler thermostat early. A config entity: kept off dashboards."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+    entity_id = "button.smart_heating_cancel_boiler_hold"
+
+    def __init__(self, entry_id: str, state: dict) -> None:
+        self._state = state
+        self._attr_name = tr(state["lang"], "entity.cancel_boiler_hold")
+        self._attr_unique_id = f"{entry_id}_cancel_boiler_hold"
+
+    async def async_press(self) -> None:
+        await end_boiler_hold(self._state)
+
+
+async def end_boiler_hold(state: dict) -> None:
+    """End a manual hold on the boiler thermostat now (button and service); no-op without one."""
+    coordinator = state.get("coordinator")
+    if coordinator is None or not coordinator.controller.end_boiler_hold(dt_util.utcnow()):
+        return
+    _LOGGER.info("Manual hold on the boiler thermostat ended by request")
+    await coordinator.async_request_refresh()
+
+
 async def start_boost(state: dict, room: str, duration: timedelta) -> None:
     """Heat `room` to comfort for `duration` from now (buttons and the boost service)."""
     state["boosts"][room] = Boost(dt_util.utcnow(), duration)
@@ -108,4 +138,5 @@ async def async_setup_entry(
     entities += [CancelBoostButton(entry.entry_id, r, state) for r in state["rooms"]]
     entities.append(ManualRoomOverrideButton(entry.entry_id, state))
     entities.append(CancelManualRoomOverrideButton(entry.entry_id, state))
+    entities.append(CancelBoilerHoldButton(entry.entry_id, state))
     async_add_entities(entities)

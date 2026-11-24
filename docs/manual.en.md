@@ -207,7 +207,7 @@ An alert only appears when something really needs attention. It disappears by it
 You are free to turn the knobs in the house. Smart Heating takes that into account.
 
 - **Turning a smart radiator valve:** the setting you choose stays until that room's schedule changes next. Then the system takes over again. If you set the valve above the lower temperature and the room is colder than what you set, the boiler fires too. Meanwhile the room shows *Set by hand to …*.
-- **Turning the boiler thermostat** (the thermostat that switches the boiler): your setting is respected for about two hours. After that Smart Heating carries on.
+- **Turning the boiler thermostat** (the thermostat that switches the boiler): your setting is respected for about two hours. After that Smart Heating carries on. Want it back sooner? The administrator can end it with the button *End manual change on the boiler thermostat* (Settings → Devices & services → Entities) or the `smart_heating.cancel_boiler_hold` action.
 - **Changing a room's temperature in Home Assistant:** that is not possible. You get a message saying the target is set by Smart Heating. Use **Boost** instead, or ask the administrator to change the schedule or the temperatures.
 
 ## Frequently asked questions

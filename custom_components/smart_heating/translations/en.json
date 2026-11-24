@@ -183,6 +183,10 @@
     "cancel_vacation": {
       "name": "Cancel vacation",
       "description": "End a manual vacation (calendar vacations follow the calendar)."
+    },
+    "cancel_boiler_hold": {
+      "name": "End boiler thermostat manual change",
+      "description": "Stop respecting a setpoint changed by hand on the boiler thermostat now, so Smart Heating controls the boiler again."
     }
   },
   "exceptions": {

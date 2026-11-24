@@ -157,3 +157,27 @@ async def test_options_flow_saves_notify_and_correction_settings(hass):
     flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "save"})
     assert flow["type"] == "create_entry"
     assert entry.options["notify_targets"] == ["notify.phone"] and entry.options["notify_delay_minutes"] == 30
+
+
+async def test_cancel_boiler_hold_service_and_button(hass):
+    from custom_components.smart_heating.engine import Commands
+
+    set_home(hass, bed_temp=21.0)
+    await setup_entry(hass)
+    controller = hass.data[DOMAIN]["e1"]["coordinator"].controller
+    button = hass.states.get("button.smart_heating_cancel_boiler_hold")
+    assert button is not None
+    assert er.async_get(hass).async_get(button.entity_id).entity_category == "config"
+
+    now = dt_util.utcnow()
+    for cancel in (
+        lambda: hass.services.async_call(DOMAIN, "cancel_boiler_hold", {}, blocking=True),
+        lambda: hass.services.async_call("button", "press", {"entity_id": button.entity_id}, blocking=True),
+    ):
+        controller.restore(
+            Commands(boiler_setpoint=10.0, boiler_changed_at=now - timedelta(hours=1), boiler_hold_until=now + timedelta(hours=1))
+        )
+        await cancel()
+        await hass.async_block_till_done()
+        hold = controller.commands.boiler_hold_until
+        assert hold is None or hold <= dt_util.utcnow()

@@ -207,7 +207,7 @@ Een melding verschijnt alleen als er echt iets aandacht nodig heeft. Heeft de be
 Je mag gewoon aan de knoppen in huis draaien. Smart Heating houdt daar rekening mee.
 
 - **Aan een slimme radiatorkraan draaien:** de stand die je kiest, blijft staan tot het schema van die kamer de volgende keer verandert. Daarna neemt het systeem het weer over. Zet je de kraan hoger dan de lagere temperatuur en is de kamer kouder dan wat je instelde, dan slaat de ketel ook aan. Bij de kamer staat zolang *Handmatig ingesteld op …*.
-- **Aan de ketelthermostaat draaien** (de thermostaat die de ketel aanzet): je instelling wordt ongeveer twee uur gerespecteerd. Daarna gaat Smart Heating weer verder.
+- **Aan de ketelthermostaat draaien** (de thermostaat die de ketel aanzet): je instelling wordt ongeveer twee uur gerespecteerd. Daarna gaat Smart Heating weer verder. Eerder terug? De beheerder kan het beëindigen met de knop *Handmatige wijziging op de ketelthermostaat beëindigen* (Instellingen → Apparaten & diensten → Entiteiten) of de actie `smart_heating.cancel_boiler_hold`.
 - **In Home Assistant de temperatuur van een kamer veranderen:** dat kan niet. Je krijgt dan de melding dat het doel door Smart Heating wordt bepaald. Gebruik in plaats daarvan **Boost**, of vraag de beheerder het schema of de temperaturen aan te passen.
 
 ## Veelgestelde vragen

@@ -31,6 +31,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["binary_sensor", "button", "climate", "datetime", "sensor", "switch"]
 SERVICE_SET_VACATION = "set_vacation"
 SERVICE_CANCEL_VACATION = "cancel_vacation"
+SERVICE_CANCEL_BOILER_HOLD = "cancel_boiler_hold"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -40,13 +41,17 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     from homeassistant.helpers import config_validation as cv
     from homeassistant.util import dt as dt_util
 
+    from .button import end_boiler_hold
     from .vacation_plan import VacationPeriod
 
-    def _state():
+    def _shared() -> dict:
         entries = list(hass.data.get(DOMAIN, {}).values())
         if not entries:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
-        return entries[0]["vacation"]
+        return entries[0]
+
+    def _state():
+        return _shared()["vacation"]
 
     async def set_vacation(call: ServiceCall) -> None:
         start = dt_util.as_local(call.data.get("start") or dt_util.now())
@@ -64,7 +69,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         set_vacation,
         vol.Schema({vol.Optional("start"): cv.datetime, vol.Required("end"): cv.datetime}),
     )
+    async def cancel_boiler_hold(call: ServiceCall) -> None:
+        await end_boiler_hold(_shared())
+
     hass.services.async_register(DOMAIN, SERVICE_CANCEL_VACATION, cancel_vacation, vol.Schema({}))
+    hass.services.async_register(DOMAIN, SERVICE_CANCEL_BOILER_HOLD, cancel_boiler_hold, vol.Schema({}))
     return True
 
 

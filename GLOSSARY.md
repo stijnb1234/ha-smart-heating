@@ -45,7 +45,7 @@ global one applies.
 
 **Manual hold**: A setpoint changed by hand on the boiler thermostat, respected for a while before
 Smart Heating writes again. If the hand-set value is what Smart Heating wants anyway when the hold
-ends, it is adopted.
+ends, it is adopted. It can be ended early (a config button or the `cancel_boiler_hold` action).
 
 ## Targets
 
