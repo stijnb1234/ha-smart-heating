@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
+from collections import deque
 from datetime import datetime, timedelta
+
+from .calibration import RadiatorState
+from .models import EPSILON
 
 COAST_MAX_WAIT = timedelta(minutes=60)
 COAST_FALL = 0.1  # K below the peak that ends the coast observation
 # No new peak for this long ends it too: a sensor that moves in 0.5 K steps never shows a fall.
 COAST_PLATEAU = timedelta(minutes=20)
 STALL_AFTER = timedelta(minutes=45)
+# Floor heating responds slowly: it gets as long as its default pre-heat lead time.
+STALL_AFTER_FLOOR = timedelta(hours=3)
 STALL_RISE = 0.3  # K of warming that counts as progress
+STALL_REST = timedelta(hours=3)  # how long a stalled Room stops calling before it tries again
+# A Room that would need longer than this to reach its target is stalled even though it creeps up.
+STALL_REACH = timedelta(hours=6)
+# The rise rate is measured over this long, so one step of a coarse sensor says little.
+STALL_RATE_WINDOW = timedelta(hours=2)
 
 
 class CoastTracker:
@@ -54,21 +65,123 @@ class CoastTracker:
 
 
 class StallTracker:
-    """Rooms that keep calling for heat but do not get warmer."""
+    """Rooms that keep calling for heat without getting anywhere (stuck valve, open window):
+    flat, or rising so slowly that the target stays out of reach.
+
+    Such a Room cannot be helped by the boiler, so it rests: it stops calling for `STALL_REST`,
+    then gets another try. It stays stalled until it warms up fast enough (also on other Rooms'
+    calls) or no longer needs heat.
+    """
 
     def __init__(self) -> None:
-        self._since: dict[str, tuple[datetime, float]] = {}
+        self._since: dict[str, tuple[datetime, float]] = {}  # running try: (started, temp then)
+        self._stalled: dict[str, datetime] = {}  # stalled room -> resting until
+        # Readings of a running try, or since it stalled: the last STALL_RATE_WINDOW and one before.
+        self._readings: dict[str, deque[tuple[datetime, float]]] = {}
 
-    def observe(self, room: str, now: datetime, temp: float | None, calling: bool) -> None:
-        if temp is None or not calling:
+    def observe(
+        self,
+        room: str,
+        now: datetime,
+        temp: float | None,
+        calling: bool,
+        *,
+        unmet: bool = True,
+        heated: bool = True,
+        after: timedelta = STALL_AFTER,
+        target: float | None = None,
+    ) -> None:
+        """`unmet`: the Room is still colder than a target it may call for. `heated`: a call
+        actually reaches the boiler, so a Room that does not warm up is the Room's own fault.
+        `target`: also judge whether the Room reaches it within STALL_REACH; None (floor
+        heating, slow by nature) only judges whether it warms at all."""
+        if temp is None or not unmet:
+            self.reset(room)
+            return
+        if room not in self._stalled and not (calling and heated):
+            self.reset(room)
+            return
+        readings = self._readings.setdefault(room, deque())
+        readings.append((now, temp))
+        while len(readings) > 1 and now - readings[1][0] >= STALL_RATE_WINDOW:
+            readings.popleft()
+        if room in self._stalled and self._recovered(readings, temp, target):
+            del self._stalled[room]
+            self._since.pop(room, None)
+        if not (calling and heated):
             self._since.pop(room, None)
             return
         started = self._since.get(room)
-        if started is None or temp >= started[1] + STALL_RISE:
-            self._since[room] = (now, temp)
+        if started is None or temp >= started[1] + STALL_RISE - EPSILON:
+            started = self._since[room] = (now, temp)
+        flat = now - started[0] >= after
+        then, before = readings[0]
+        crawling = (
+            target is not None
+            and now - then >= STALL_RATE_WINDOW
+            and not self._reaches(temp - before, now - then, target - temp)
+        )
+        if flat or crawling:
+            # Start over: what counts from here on is how the Room does after giving up.
+            self._since.pop(room, None)
+            self._stalled[room] = now + STALL_REST
+            self._readings[room] = deque([(now, temp)])
 
-    def stalled(self, now: datetime) -> frozenset[str]:
-        return frozenset(r for r, (at, _) in self._since.items() if now - at >= STALL_AFTER)
+    @staticmethod
+    def _reaches(rise: float, over: timedelta, shortfall: float) -> bool:
+        return rise * (STALL_REACH / over) >= shortfall - EPSILON
+
+    def _recovered(
+        self, readings: deque[tuple[datetime, float]], temp: float, target: float | None
+    ) -> bool:
+        rise = temp - min(value for _, value in readings)
+        if rise < STALL_RISE - EPSILON:
+            return False
+        return target is None or self._reaches(rise, STALL_RATE_WINDOW, target - temp)
+
+    def reset(self, room: str) -> None:
+        self._since.pop(room, None)
+        self._stalled.pop(room, None)
+        self._readings.pop(room, None)
+
+    def stalled(self) -> frozenset[str]:
+        return frozenset(self._stalled)
+
+    def resting(self, now: datetime) -> frozenset[str]:
+        """Stalled Rooms that do not call for heat right now."""
+        return frozenset(r for r, until in self._stalled.items() if now < until)
+
+
+RADIATOR_WARMUP = timedelta(minutes=30)
+# Warmth above this counts as a hot radiator for calibration entries.
+WARM_ENOUGH = 0.8
+
+
+class RadiatorWarmth:
+    """How warm each radiator is, from 0 (cold) to 1 (hot), from when it was being heated."""
+
+    def __init__(self) -> None:
+        # room -> (first seen, last seen, heated then, warmth)
+        self._state: dict[str, tuple[datetime, datetime, bool, float]] = {}
+
+    def observe(self, room: str, now: datetime, hot: bool) -> None:
+        first, last, was_hot, warmth = self._state.get(room, (now, now, hot, 0.0))
+        step = (now - last) / (RADIATOR_WARMUP if was_hot else RADIATOR_COOLDOWN)
+        warmth = min(max(warmth + (step if was_hot else -step), 0.0), 1.0)
+        self._state[room] = (first, now, hot, warmth)
+
+    def warmth(self, room: str) -> float:
+        return self._state[room][3] if room in self._state else 0.0
+
+    def settled(self, room: str, now: datetime) -> RadiatorState | None:
+        """The radiator's state when it is clearly cold or hot. Unknown shortly after a start:
+        what the radiator did before then was not seen."""
+        if room not in self._state or now - self._state[room][0] < RADIATOR_COOLDOWN:
+            return None
+        _, _, hot, warmth = self._state[room]
+        if warmth >= WARM_ENOUGH:
+            return "heating"
+        return "cold" if not hot and warmth <= EPSILON else None
 
 
 # Long enough for the remaining fall to stay below the lowest learned window threshold (0.5 K).

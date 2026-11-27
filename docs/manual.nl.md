@@ -126,7 +126,7 @@ Deze dingen gebeuren automatisch. Je hoeft er niets voor te doen.
 - **Onderweg naar huis:** staat de Home Assistant-app met locatie op je telefoon, dan ziet het systeem dat je dichterbij komt en schat het wanneer je thuis bent. Op tijd om op te warmen begint het huis te verwarmen, zodat het warm is als je binnenkomt. Niets in te stellen, geen zones.
 - **Vloerverwarming:** vloerverwarming is traag. Een kamer met vloerverwarming begint daarom al een paar uur voor de geplande tijd. Zolang die opwarmt, blijven de radiatoren in kamers die niet gebruikt worden dicht, zodat de warmte naar de vloer gaat.
 - **Kamers zonder slimme kranen:** die vragen om warmte als het er koud is en zetten de ketel uit zodra het warm genoeg is. Zie [Kamers zonder slimme kranen](#kamers-zonder-slimme-kranen).
-- **Een kamer die niet warmer wordt:** vraagt een kamer al driekwartier om warmte en is hij nauwelijks warmer geworden, dan krijg je een melding. Zie [Meldingen](#meldingen-1).
+- **Een kamer die niet warmer wordt:** vraagt een kamer al driekwartier om warmte en is hij nauwelijks warmer geworden (of warmt hij na twee uur zo traag op dat het meer dan zes uur zou duren), dan krijg je een melding en stopt die kamer drie uur met warmte vragen, waarna hij het opnieuw probeert (vloerverwarming krijgt eerst drie uur de tijd). Zie [Meldingen](#meldingen-1).
 - **Kraan uitgezet:** staat een slimme radiatorkraan uit, dan zet het systeem hem vanzelf weer aan.
 - **Weekrapport:** elke maandag om 08:00 krijg je een bericht in Home Assistant (bij het belletje). Daarin staat hoeveel gas er is gebruikt vergeleken met vorig jaar, rekening houdend met hoe koud het was, hoeveel uur elke kamer verwarmd is en of er problemen waren. Heeft het systeem een gewoonte van je opgemerkt, dan staat er ook een suggestie voor het schema in.
 
@@ -146,6 +146,16 @@ Goed om te weten:
 - **Eén sensor, één kamer.** Dekt één thermometer meerdere verbonden kamers, voeg ze dan toe als één kamer in plaats van meerdere kamers op dezelfde thermometer. Dat werkt even goed en is makkelijker bij te houden.
 - **Een koude kamer moet soms wachten.** Zolang de kamer met open radiatoren warm is, blijft de ketel uit, ook als een andere kamer wat te koud is. Dat is de prijs van de open radiatoren. Twee manieren eromheen: draai een radiator met de hand dicht, of gebruik de **Handmatige ruimte-override**, die de ketel altijd aanzet.
 - **Zijn de kranen er eenmaal,** dan zet de beheerder *open radiatoren* uit, voegt hij de kamers toe als gewone kamers met hun kranen, en haalt hij de gecombineerde kamer weg als die er was. De begrenzing verdwijnt dan vanzelf, omdat elke kraan zijn eigen radiator dichtdraait.
+
+## Kamers zonder ruimtesensor
+
+Sommige kamers hebben geen losse thermometer. Het systeem leest de temperatuur dan af op de radiatorkraan, die vlak naast de radiator zit en te hoog meet zolang die warm is. Je kunt het verschil aanleren:
+
+1. Leg een thermometer in de kamer, niet bij de radiator, en wacht een kwartier.
+2. Vul de waarde in bij **thermometerwaarde** van die kamer (vraag de beheerder waar je die vindt).
+3. Doe dit een keer met een koude radiator en een keer met een warme. Je krijgt een melding als de andere nog nodig is.
+
+Zegt het systeem dat de radiator opwarmt of afkoelt, probeer het dan later opnieuw. Meer waarden invullen maakt de correctie beter.
 
 ## Het systeem leert
 
@@ -198,7 +208,7 @@ Een melding verschijnt alleen als er echt iets aandacht nodig heeft. Heeft de be
 | De radiatorkraan in de kamer staat uit en gaat niet weer aan. | Het systeem probeerde de kraan aan te zetten, maar dat lukte niet. Kijk op de kraan zelf of laat het de beheerder weten. |
 | De radiatorkraan in de kamer neemt zijn temperatuur niet over. | De kraan kreeg een paar keer een temperatuur, maar nam die niet over. Vaak helpt nieuwe batterijen plaatsen. |
 | De temperatuursensor in de kamer meldt niets meer. | De losse thermometer in die kamer is stil. Kijk of de batterij leeg is. Tot die tijd gebruikt het systeem de thermometer in de radiatorkraan. |
-| De kamer vraagt steeds om warmte maar wordt niet warmer. | Mogelijk staat een raam open of werkt de radiator niet. Controleer beide. |
+| De kamer vraagt steeds om warmte maar wordt nauwelijks warmer. | Mogelijk staat een raam open of werkt de radiator niet. Controleer beide. Tot de kamer weer opwarmt, wordt de ketel er maar om de paar uur voor aangezet (een Boost probeert het meteen opnieuw). |
 | De kamer is al lange tijd te koud en haalt zijn doel niet. | Kijk of er een raam of deur openstaat en of de radiator warm wordt. Blijft het zo, laat het de beheerder weten. |
 | De ketelthermostaat is onbereikbaar. | De ketel kan even niet betrouwbaar worden aangestuurd. De radiatorkranen volgen gewoon het schema. Meestal lost dit zichzelf op. |
 

@@ -4,6 +4,9 @@ Such a valve regulates on its own sensor next to the radiator, which reads warme
 room. The value written is the Room's target plus that difference (rounded to half degrees,
 capped), so the room itself reaches the target. A deadband keeps the last written value while
 the difference wanders a little, so the valve is not rewritten every few minutes.
+
+A calibrated TRV without a room sensor is corrected by its hot-radiator offset: that is when the
+valve regulates, and a fixed value avoids rewrites as the radiator warms and cools.
 """
 
 from __future__ import annotations
@@ -27,7 +30,13 @@ def trv_writes(inp: EngineInput, targets: Mapping[str, float]) -> dict[str, floa
     writes = dict(targets)
     for room in inp.config.rooms:
         name = room.name
-        if not room.compensate_trv or name not in inp.trv_without_external or name not in targets:
+        if not room.compensate_trv or name not in targets:
+            continue
+        if name in inp.calibrated and name not in inp.external_temps:
+            correction = min(max(-inp.calibrated[name].heating, -MAX_CORRECTION), MAX_CORRECTION)
+            writes[name] = min(max(_half(targets[name] + correction), MIN_SETPOINT), MAX_SETPOINT)
+            continue
+        if name not in inp.trv_without_external:
             continue
         trv, ext = inp.trv_temps.get(name), inp.external_temps.get(name)
         if (

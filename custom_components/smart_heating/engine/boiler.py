@@ -20,6 +20,7 @@ def demand_rooms(
     hand_set: Mapping[str, float] | None = None,
     coast: Mapping[str, float] | None = None,
     settling: frozenset[str] = frozenset(),
+    resting: frozenset[str] = frozenset(),
 ) -> tuple[str, ...]:
     """Rooms heating to comfort that are colder than target by more than the hysteresis.
 
@@ -32,6 +33,7 @@ def demand_rooms(
     A Room in `settling` (its call just ended, the radiator is still giving off heat) does not call
     again unless it is more than SETTLE_RELEASE colder than its margin allows: a restart then would
     only add heat on top of the heat still coming.
+    A Room in `resting` called for long without warming up and does not call until its next try.
     """
     wanted = wanted_targets(config, trv_setpoints, hand_set)
     margins = demand_margins(config, coast)
@@ -39,6 +41,7 @@ def demand_rooms(
         room.name
         for room in config.rooms
         if room.name in wanted
+        and room.name not in resting
         and room.name in room_temps
         and room_temps[room.name] < wanted[room.name] - margins[room.name]
         and not (

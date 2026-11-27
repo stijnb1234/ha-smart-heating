@@ -166,6 +166,20 @@
       "name": "Boost stoppen",
       "description": "Stop een lopende Boost; de ruimte volgt weer het schema."
     },
+    "calibrate": {
+      "name": "Radiatorkraan ijken",
+      "description": "Vul in wat een thermometer in de ruimte nu aangeeft, niet bij de radiator. Eén keer nodig met een koude radiator en één keer terwijl hij verwarmt.",
+      "fields": {
+        "temperature": {
+          "name": "Thermometerwaarde",
+          "description": "Graden Celsius."
+        }
+      }
+    },
+    "clear_calibration": {
+      "name": "IJking wissen",
+      "description": "Vergeet de ingevulde thermometerwaarden van deze ruimte."
+    },
     "set_vacation": {
       "name": "Vakantie instellen",
       "description": "Houd het huis op vorstbescherming vanaf de start tot je terug bent. Elke ruimte begint op tijd op te warmen voor je terugkomst.",
@@ -198,6 +212,18 @@
     },
     "not_loaded": {
       "message": "Smart Heating is niet ingesteld."
+    },
+    "calibration_not_possible": {
+      "message": "Alleen een ruimte met een radiatorkraan en zonder ruimtesensor kan worden geijkt."
+    },
+    "calibration_no_trv_reading": {
+      "message": "De radiatorkraan heeft kort geleden geen temperatuur gemeld."
+    },
+    "calibration_radiator_changing": {
+      "message": "De radiator warmt op of koelt af, of Smart Heating is minder dan een uur geleden gestart. Probeer het opnieuw als de radiator al een tijdje duidelijk koud of warm is."
+    },
+    "calibration_implausible": {
+      "message": "Deze waarde wijkt te veel af van de radiatorkraan. Controleer de waarde."
     }
   }
 }

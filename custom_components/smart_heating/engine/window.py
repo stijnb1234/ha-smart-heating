@@ -9,8 +9,9 @@ from .models import EPSILON, EngineInput, RoomConfig, SensorReading
 
 MIN_PAUSE = timedelta(minutes=15)
 MAX_PAUSE = timedelta(minutes=30)
-# The TRV sensor sits on the radiator and swings by degrees without the room changing. A TRV that
-# reports its valve is judged by that. Otherwise, with a room sensor on top, a fast fall there must show in the room too: at least this share of the
+# The TRV sensor sits on the radiator and swings by degrees without the room changing, with the
+# valve open too (some fall while heating). So with a room sensor on top, a fast fall there must show
+# in the room too: at least this share of the
 # threshold (two steps of a sensor that reports in 0.5 K steps), but not less than MIN_CORROBORATION K.
 CORROBORATION = 0.75
 MIN_CORROBORATION = 0.3
@@ -54,11 +55,14 @@ def _fast_fall(room: RoomConfig, inp: EngineInput, ceiling: float) -> bool:
     drop = recent_drop(window_history(room, inp), inp.now, room.window_period, ceiling)
     if drop is None or drop < threshold - EPSILON:
         return False
-    if room.name in inp.cooling_rooms or room.name in inp.valve_known:
-        return True  # judged by the room sensor alone, or the valve state already explains the TRV sensor
+    if room.name in inp.cooling_rooms:
+        return True  # already judged by the room sensor alone
+    sensor = inp.external_temps.get(room.name)
+    if sensor is None or inp.now - sensor.at >= inp.config.sensors.external_stale_after:
+        return True  # no room sensor to check against
     room_drop = recent_drop(inp.external_history.get(room.name, ()), inp.now, room.window_period, ceiling)
     if room_drop is None:
-        return True  # no room sensor to check against
+        return False  # the sensor reported nothing to compare: no sign of a fall in the room
     return room_drop >= max(threshold * CORROBORATION, MIN_CORROBORATION) - EPSILON
 
 

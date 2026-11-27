@@ -166,6 +166,20 @@
       "name": "Cancel Boost",
       "description": "Stop a running Boost; the room follows its schedule again."
     },
+    "calibrate": {
+      "name": "Calibrate a radiator valve",
+      "description": "Enter what a thermometer in the room reads now, away from the radiator. Needed once with the radiator cold and once while it heats.",
+      "fields": {
+        "temperature": {
+          "name": "Thermometer reading",
+          "description": "Degrees Celsius."
+        }
+      }
+    },
+    "clear_calibration": {
+      "name": "Clear calibration",
+      "description": "Forget the thermometer readings entered for this room."
+    },
     "set_vacation": {
       "name": "Set vacation",
       "description": "Hold the house at frost protection from the start until you are back. Each room starts warming up in time for your return.",
@@ -198,6 +212,18 @@
     },
     "not_loaded": {
       "message": "Smart Heating is not set up."
+    },
+    "calibration_not_possible": {
+      "message": "Only a room with a radiator valve and without a room sensor can be calibrated."
+    },
+    "calibration_no_trv_reading": {
+      "message": "The radiator valve has not reported a temperature recently."
+    },
+    "calibration_radiator_changing": {
+      "message": "The radiator is warming up or cooling down, or Smart Heating started less than an hour ago. Try again when the radiator has been clearly cold or hot for a while."
+    },
+    "calibration_implausible": {
+      "message": "This reading differs too much from the radiator valve. Check the value."
     }
   }
 }

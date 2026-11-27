@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["binary_sensor", "button", "climate", "datetime", "sensor", "switch"]
+PLATFORMS = ["binary_sensor", "button", "climate", "datetime", "number", "sensor", "switch"]
 SERVICE_SET_VACATION = "set_vacation"
 SERVICE_CANCEL_VACATION = "cancel_vacation"
 SERVICE_CANCEL_BOILER_HOLD = "cancel_boiler_hold"
@@ -132,6 +132,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from homeassistant.util import dt as dt_util
 
     from . import dashboard_panel
+    from .calibration_store import CalibrationStore
     from .commands_store import CommandsStore
     from .coordinator import Persistence, SmartHeatingCoordinator
     from .insights_store import InsightsStore
@@ -163,6 +164,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = shared
     learner_store, insights_store = LearnerStore(hass, keys), InsightsStore(hass, keys)
     commands_store = CommandsStore(hass, keys)
+    calibration_store = CalibrationStore(hass, keys)
     restored, away_since = await commands_store.async_load([r["name"] for r in rooms])
     persistence = Persistence(
         learner_store=learner_store,
@@ -170,6 +172,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         commands_store=commands_store,
         insights_store=insights_store,
         insights=await insights_store.async_load(),
+        calibration_store=calibration_store,
+        calibration=await calibration_store.async_load(),
         restored=restored,
         away_since=away_since,
     )

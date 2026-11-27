@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, time, timedelta
 
+import pytest
+
 from custom_components.smart_heating.controller import Controller, Snapshot
 from custom_components.smart_heating.engine import (
     Boost,
@@ -9,6 +11,7 @@ from custom_components.smart_heating.engine import (
     ScheduleWindow,
     SensorReading,
 )
+from custom_components.smart_heating.engine.calibration import CalibrationError
 from custom_components.smart_heating.engine.learner import LeadTimeLearner
 from custom_components.smart_heating.gather import (
     battery_is_low,
@@ -290,3 +293,64 @@ def test_ending_the_boiler_hold_without_one_does_nothing():
     _held_by_hand(c, hold_left=timedelta(minutes=-1))  # already ran out
     assert not c.end_boiler_hold(T0)
     assert c.commands.boiler_hold_until == T0 - timedelta(minutes=1)
+
+
+def test_room_that_does_not_warm_up_stops_calling_the_boiler_until_a_boost():
+    boosts = {}
+    c = Controller(CONFIG, LeadTimeLearner(), boosts, {})  # make() drops an empty dict
+
+    def run(minute):
+        cycle = c.step(snap(T0 + timedelta(hours=6, minutes=minute), temp=17.0))
+        c.confirm(cycle, {"work": 20.0}, Commands())
+        return cycle.decision.demand_rooms
+
+    assert run(0) == ("work",)
+    for m in range(5, 50, 5):
+        run(m)
+    assert run(50) == ()
+    boosts["work"] = Boost(T0 + timedelta(hours=6, minutes=55), timedelta(minutes=60))
+    run(55)
+    assert run(56) == ("work",)
+
+
+def _cycle(c, minute, temp, **kw):
+    cycle = c.step(snap(T0 + timedelta(hours=6, minutes=minute), temp=temp, **kw))
+    c.confirm(cycle, dict(cycle.decision.trv_writes), Commands())
+    return cycle
+
+
+def test_calibration_corrects_room_temperature_and_trv_setpoint():
+    c = make()
+    for m in range(0, 61, 5):
+        _cycle(c, m, 21.0, valve_known=frozenset({"work"}))
+    assert c.calibrate("work", 20.0) == "cold"
+    assert c.calibration_requests() == frozenset()  # cold is done, radiator still cold
+    for m in range(65, 126, 5):
+        _cycle(c, m, 21.0, valve_known=frozenset({"work"}))
+    assert c.calibration_requests() == frozenset()
+    for m in range(130, 186, 5):  # called for and valve open: the radiator heats
+        cycle = _cycle(c, m, 18.0, valve_known=frozenset({"work"}), valve_open=frozenset({"work"}))
+    assert cycle.decision.demand_rooms == ("work",)
+    assert c.calibration_requests() == {("work", "heating")}
+    assert c.calibrate("work", 15.0) == "heating"
+    cycle = _cycle(c, 190, 22.0, valve_known=frozenset({"work"}), valve_open=frozenset({"work"}))
+    assert cycle.decision.room_temps["work"] == 19.0  # 22 on the valve is 19 in the room
+    assert cycle.decision.trv_setpoints["work"] == 20.0
+    assert cycle.decision.trv_writes["work"] == 23.0  # so the valve does not close early
+    c.clear_calibration("work")
+    assert _cycle(c, 195, 22.0).decision.room_temps["work"] == 22.0
+
+
+def test_calibration_is_refused_while_the_radiator_state_is_unclear():
+    c = make()
+    c.step(snap(T0, temp=18.0))
+    with pytest.raises(CalibrationError) as error:
+        c.calibrate("work", 18.0)
+    assert error.value.key == "calibration_radiator_changing"
+
+
+def test_a_room_with_a_room_sensor_ignores_calibration():
+    c = make()
+    c.calibration.add("work", "cold", T0, 15.0, 20.0)
+    c.calibration.add("work", "heating", T0, 15.0, 20.0)
+    assert c.step(snap(T0, temp=21.0, ext=19.0)).decision.room_temps["work"] == 19.0

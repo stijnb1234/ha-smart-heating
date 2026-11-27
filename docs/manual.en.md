@@ -126,7 +126,7 @@ These things happen automatically. You don't need to do anything.
 - **On the way home:** if your phone has the Home Assistant app with location on, the system sees you coming closer and estimates when you will be home. Early enough to warm up, the house starts heating, so it is warm when you walk in. Nothing to set up, no zones.
 - **Floor heating:** floor heating is slow. A room with floor heating therefore starts a few hours before the scheduled time. While it warms up, the radiators in rooms not in use stay closed, so the heat goes to the floor.
 - **Rooms without smart valves yet:** these rooms ask for heat when they are cold and stop the boiler once they are warm enough. See [Rooms without smart valves](#rooms-without-smart-valves).
-- **A room that doesn't warm up:** if a room has been asking for heat for three quarters of an hour and has barely become any warmer, you get an alert. See [Alerts](#alerts-1).
+- **A room that doesn't warm up:** if a room has been asking for heat for three quarters of an hour and has barely become any warmer (or after two hours is warming so slowly that it would take more than six hours to get warm), you get an alert and that room stops asking for heat for three hours, after which it tries again (floor heating first gets three hours). See [Alerts](#alerts-1).
 - **Valve switched off:** if a smart radiator valve is switched off, the system switches it back on.
 - **Weekly report:** every Monday at 08:00 you get a notification in Home Assistant (under the bell). It shows how much gas was used compared to last year, taking into account how cold it was, how many hours each room was heated, and whether there were any problems. If the system noticed a habit of yours, the report also contains a suggestion for the schedule.
 
@@ -146,6 +146,16 @@ A few things to know:
 - **One sensor, one room.** If one thermometer covers several connected rooms, add them as one room instead of several rooms on the same thermometer. That works just as well and is easier to keep up.
 - **A cold room has to wait sometimes.** While the room with open radiators is warm, the boiler stays off, even if another room is a bit too cold. That is the price of the open radiators. Two ways around it: close a radiator by hand, or use the **Manual room override**, which always gets the boiler going.
 - **When the valves are in,** the administrator switches *open radiators* off, adds the rooms as ordinary rooms with their valves, and removes the combined room if there was one. The ceiling then goes away by itself, because every valve closes its own radiator.
+
+## Rooms without a room sensor
+
+Some rooms have no separate thermometer. The system then reads the temperature from the radiator valve, which sits right next to the radiator and reads too high while it is hot. You can teach it the difference:
+
+1. Put a thermometer in the room, not near the radiator, and wait a quarter of an hour.
+2. Enter what it reads at **thermometer reading** for that room (ask the administrator where to find it).
+3. Do this once while the radiator is cold and once while it is warm. You get a notification when the other one is wanted.
+
+If the system says the radiator is warming up or cooling down, try again later. Entering more readings makes the correction better.
 
 ## The system learns
 
@@ -198,7 +208,7 @@ An alert only appears when something really needs attention. It disappears by it
 | The radiator valve in the room is switched off and does not turn back on. | The system tried to switch the valve on but could not. Check the valve itself or let the administrator know. |
 | The radiator valve in the room does not accept its temperature. | The valve was sent a temperature a few times but did not take it. New batteries often help. |
 | The temperature sensor in the room stopped reporting. | The separate thermometer in that room has gone quiet. Check whether its battery is empty. Until then the system uses the thermometer in the radiator valve. |
-| The room keeps asking for heat but is not warming up. | A window may be open, or the radiator is not working. Check both. |
+| The room keeps asking for heat but is barely warming up. | A window may be open, or the radiator is not working. Check both. Until the room warms up, it only gets the boiler going once every few hours (a Boost tries again right away). |
 | The room has been too cold for a long time and is not reaching its target. | Check whether a window or door is open and whether the radiator gets warm. If it stays this way, let the administrator know. |
 | The boiler thermostat cannot be reached. | The boiler cannot be controlled reliably for now. The radiator valves keep following the schedule. This usually sorts itself out. |
 

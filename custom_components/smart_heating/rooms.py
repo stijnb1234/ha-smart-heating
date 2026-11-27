@@ -375,5 +375,12 @@ def absent_rooms(
     )
 
 
+def calibratable_rooms(
+    rooms: Sequence[RoomConfig], sensors: Mapping[str, str], trvs: Mapping[str, Any]
+) -> frozenset[str]:
+    """Rooms whose temperature comes from the TRV alone, so calibrating it makes sense."""
+    return frozenset(r.name for r in rooms if r.name in trvs and r.name not in sensors)
+
+
 def sensor_entities(rooms: Sequence[Mapping[str, Any]]) -> dict[str, str]:
     return {r["name"]: r["sensor_entity"] for r in rooms if r.get("sensor_entity")}

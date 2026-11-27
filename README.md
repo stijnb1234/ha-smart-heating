@@ -35,6 +35,7 @@ Smart Heating sets each room's target temperature from a schedule, presence, Boo
 ### Automatic behaviour
 
 - **Open-window detection**: a fast temperature drop pauses a room for 15–30 minutes. It ignores the false drops a radiator causes when it cools: it uses the valve state and the room sensor, and times readings by when the sensor reported them. A threshold learned per room (never looser than the one you configure) fits each room's own noise.
+- **Calibration** for rooms without a room sensor: enter a few times what a thermometer in the room reads, with the radiator cold and hot, and the valve's temperature is corrected for it.
 - **Self-learning**, persisted per room with safe fallbacks until there is data: how far a room keeps warming after the boiler call ends (so the call ends earlier and does not overshoot), the difference between the room sensor and the TRV sensor, and habits that suggest schedule changes.
 - **Hand changes are respected**: a temperature set on a valve stays until that room's target next changes; a change on the boiler thermostat is respected for 2 hours.
 - **Lost writes are repaired**: a TRV that did not take a setpoint gets it again. A TRV that is out of reach does not use up retries, and is written to as soon as it is back.
@@ -108,6 +109,16 @@ mon-fri 07:00-09:00
 ```
 
 Dutch day names (ma, di, wo, do, vr, za, zo, dagelijks) work too.
+
+## Calibration
+
+A room without a room sensor takes its temperature from the radiator valve, which reads several degrees high while the radiator is hot. To correct that:
+
+1. Put a thermometer in the room, away from the radiator, and let it settle.
+2. Enter its reading in **`<room>` thermometer reading** (Settings → Devices & services → Entities), or use the `smart_heating.calibrate` action on the room's climate entity.
+3. Do this once with a cold radiator and once while it heats. A notification asks for the missing one. Entries are accepted only when the radiator has been clearly cold or hot for a while.
+
+The correction applies once both states are known; later entries refine it (the median of the last five per state). The valve setpoint is raised to match, unless setpoint correction is off for the room. `smart_heating.clear_calibration` starts over.
 
 ## Dashboard
 

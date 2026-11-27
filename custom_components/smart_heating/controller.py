@@ -26,12 +26,21 @@ from .engine import (
     track_unmet,
     wants_comfort,
 )
+from .engine.alerts import thermostat_outage
 from .engine.boiler import demand_margins, wanted_targets
+from .engine.calibration import Calibration, CalibrationError, Offset, RadiatorState
 from .engine.insights import RoomInsights, Suggestion
 from .engine.learner import LeadTimeLearner
 from .engine.overrides import manual_override_active
 from .engine.sensors import select_window_reading
-from .engine.trackers import CoastTracker, RadiatorCooldown, StallTracker
+from .engine.trackers import (
+    STALL_AFTER,
+    STALL_AFTER_FLOOR,
+    CoastTracker,
+    RadiatorCooldown,
+    RadiatorWarmth,
+    StallTracker,
+)
 from .engine.window import drop_threshold, recent_drop, window_history
 from .explain import Explanation, explain
 from .gather import update_history
@@ -82,11 +91,17 @@ class Controller:
         boosts: Mapping[str, Boost],
         manual_overrides: Mapping[str, ManualRoomOverride],
         insights: RoomInsights | None = None,
+        calibration: Calibration | None = None,
     ) -> None:
         self._config = config
         self._learner = learner
         self.insights = insights or RoomInsights()
         self.insights_dirty = False
+        self.calibration = calibration or Calibration()
+        self._warmth = RadiatorWarmth()
+        self._snapshot: Snapshot | None = None
+        # Rooms with a room sensor: calibration is for TRV readings only.
+        self._sensor_rooms: set[str] = set()
         self._coast = CoastTracker()
         self._stall = StallTracker()
         self._cooldown = RadiatorCooldown()
@@ -106,6 +121,42 @@ class Controller:
         self._away_since: datetime | None = None
         # Lead time of Rooms that are pre-heating, frozen when pre-heat started (see _lead_times).
         self._preheat_lead: dict[str, timedelta] = {}
+
+    def calibrate(self, room: str, reading: float) -> RadiatorState:
+        """Record what a thermometer in the room reads right now; returns the radiator state it
+        was recorded for."""
+        snap = self._snapshot
+        trv = snap.trv.get(room) if snap else None
+        if snap is None or trv is None or snap.now - trv.at >= self._config.sensors.trv_stale_after:
+            raise CalibrationError("calibration_no_trv_reading")
+        state = self._warmth.settled(room, snap.now)
+        if state is None:
+            raise CalibrationError("calibration_radiator_changing")
+        self.calibration.add(room, state, snap.now, reading, trv.value)
+        return state
+
+    def clear_calibration(self, room: str) -> None:
+        self.calibration.clear(room)
+
+    def calibration_requests(self) -> frozenset[tuple[str, RadiatorState]]:
+        """Half-calibrated Rooms whose radiator is now in the missing state: ask for it."""
+        if self._snapshot is None:
+            return frozenset()
+        found = set()
+        for room in self._config.rooms:
+            done = self.calibration.states(room.name)
+            state = self._warmth.settled(room.name, self._snapshot.now)
+            if len(done) == 1 and state is not None and state not in done:
+                found.add((room.name, state))
+        return frozenset(found)
+
+    def _calibrated(self) -> dict[str, Offset]:
+        return {
+            room.name: offset
+            for room in self._config.rooms
+            if room.name not in self._sensor_rooms
+            and (offset := self.calibration.offset(room.name, self._warmth.warmth(room.name))) is not None
+        }
 
     @property
     def commands(self) -> Commands:
@@ -142,7 +193,9 @@ class Controller:
             self._away_since = snap.now
         return self._away_since
 
-    def _lead_times(self, snap: Snapshot, offsets: Mapping[str, float]) -> dict[str, timedelta]:
+    def _lead_times(
+        self, snap: Snapshot, offsets: Mapping[str, float], calibrated: Mapping[str, Offset]
+    ) -> dict[str, timedelta]:
         """Pre-heat lead time per Room for the temperature it has to make up right now.
 
         The shortfall is comfort minus the Room's current temperature (comfort minus setback
@@ -154,7 +207,7 @@ class Controller:
         cfg = self._config.sensors
         leads: dict[str, timedelta] = {}
         for room in self._config.rooms:
-            temp = select_temperature(room, snap.external, snap.trv, snap.now, cfg, offsets)[0]
+            temp = select_temperature(room, snap.external, snap.trv, snap.now, cfg, offsets, calibrated)[0]
             nominal = room.comfort - room.setback
             shortfall = nominal if temp is None else room.comfort - temp
             if shortfall <= 0:
@@ -207,7 +260,10 @@ class Controller:
         self._record_history(snap)
         rooms = self._config.rooms
         offsets = {r.name: o for r in rooms if (o := self.insights.offset(r.name)) is not None}
-        lead_times = self._lead_times(snap, offsets)
+        self._snapshot = snap
+        self._sensor_rooms.update(snap.external)
+        calibrated = self._calibrated()
+        lead_times = self._lead_times(snap, offsets, calibrated)
         self._track_unmet(snap.now)
         inp = EngineInput(
             config=self._config,
@@ -240,9 +296,10 @@ class Controller:
             coast={r.name: c for r in rooms if (c := self.insights.coast(r.name)) is not None},
             settling=self._coast.settling(),
             learned_offsets=offsets,
-            stalled=self._stall.stalled(snap.now),
+            stalled=self._stall.stalled(),
+            resting=self._stall.resting(snap.now),
             trv_without_external=snap.trv_without_external,
-            valve_known=snap.valve_known,
+            calibrated=calibrated,
         )
         decision = decide(inp)
         self._last = (decision, inp.coast)
@@ -287,14 +344,29 @@ class Controller:
         sample = self._last_sample is None or now - self._last_sample >= SAMPLE_EVERY
         if sample:
             self._last_sample = now
+        wanted = wanted_targets(self._config, decision.trv_setpoints, decision.hand_set)
+        margins = demand_margins(self._config, inp.coast)
+        # A manual hold below boiler high, or an outage: calls do not reach the boiler.
+        heated = not thermostat_outage(inp) and (
+            decision.boiler_hold_until is None or decision.boiler_setpoint == self._config.boiler_high
+        )
         for room in self._config.rooms:
             name = room.name
             temp = decision.room_temps.get(name)
             reason = decision.reasons[name]
-            self._stall.observe(name, now, temp, name in calling)
-            rise = self._coast.observe(
-                name, now, temp, name in calling, valid=reason in ("schedule", "pre_heat")
+            self._stall.observe(
+                name,
+                now,
+                temp,
+                name in calling,
+                unmet=name in wanted and temp is not None and temp < wanted[name] - margins[name],
+                heated=heated,
+                after=STALL_AFTER_FLOOR if room.floor_heating else STALL_AFTER,
+                target=None if room.floor_heating else wanted.get(name),
             )
+            # A Room that gave up did not stop because it is warm enough: no coast to learn.
+            valid = reason in ("schedule", "pre_heat") and name not in self._stall.stalled()
+            rise = self._coast.observe(name, now, temp, name in calling, valid=valid)
             if rise is not None:
                 ins.record_coast(name, rise)
                 self.insights_dirty = True
@@ -322,9 +394,9 @@ class Controller:
                 ins.record_offset(name, ext.value - trv.value)
                 self.insights_dirty = True
         self._record_wishes(snap, decision)
-        self._observe_radiators(now, decision, snap.valve_open)
+        self._observe_radiators(now, decision, snap)
 
-    def _observe_radiators(self, now: datetime, decision: Decision, valve_open: frozenset[str]) -> None:
+    def _observe_radiators(self, now: datetime, decision: Decision, snap: Snapshot) -> None:
         """A radiator is hot while the boiler runs and its Room is below target (valve open)."""
         boiler_on = bool(decision.demand_rooms) or manual_override_active(self._overrides, now)
         for room in self._config.rooms:
@@ -333,7 +405,10 @@ class Controller:
             target = decision.hand_set.get(name, decision.trv_setpoints[name])
             self._cooldown.observe(name, now, boiler_on and temp is not None and temp < target)
             # The TRV itself says when its valve closes: the radiator then cools whatever the boiler did.
-            self._valve_cooldown.observe(name, now, name in valve_open)
+            self._valve_cooldown.observe(name, now, name in snap.valve_open)
+            # Heated: the boiler runs and the valve is open (as reported, else judged by the target).
+            is_open = name in snap.valve_open if name in snap.valve_known else temp is not None and temp < target
+            self._warmth.observe(name, now, boiler_on and is_open)
 
     def _record_wishes(self, snap: Snapshot, decision: Decision) -> None:
         """Boosts and hand-set TRVs are wishes for warmth: input for schedule suggestions."""
@@ -342,6 +417,7 @@ class Controller:
         if seen is not None:  # first cycle only seeds: boosts restored after a restart are not new
             for name, start in self._seen_boosts.items():
                 if seen.get(name) != start:
+                    self._stall.reset(name)  # asked for by hand: try again right away
                     self.insights.record_event(name, snap.now)
                     self.insights_dirty = True
         setbacks = {r.name: r.setback for r in self._config.rooms}

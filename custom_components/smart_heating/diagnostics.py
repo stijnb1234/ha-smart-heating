@@ -47,6 +47,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
     result["commands"] = commands_to_dict(controller.commands, controller.away_since)
     result["insights"] = controller.insights.to_dict()
     result["lead_time_samples"] = coordinator.learner.to_dict()
+    result["calibration"] = controller.calibration.to_dict()
     vacation = shared["vacation"].planner
     result["vacation"] = {
         "manual": vacation.manual.to_dict() if vacation.manual else None,

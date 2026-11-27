@@ -144,7 +144,7 @@ def test_fall_below_target_after_an_overshoot_still_pauses(clock):
     assert home.step(18.5) == 12.0  # 1.0 below the target
 
 
-def _with_room_sensor(home, trv_temp, room_temp, valve_known=False):
+def _with_room_sensor(home, trv_temp, room_temp):
     """One step where the TRV sensor and a separate room sensor report different things."""
     home.clock.advance(minutes=1)
     now = home.clock.now()
@@ -161,7 +161,6 @@ def _with_room_sensor(home, trv_temp, room_temp, valve_known=False):
             external_temps={"bedroom": home.room_history[-1]},
             temp_history={"bedroom": tuple(home.history)},
             external_history={"bedroom": tuple(home.room_history)},
-            valve_known=frozenset({"bedroom"}) if valve_known else frozenset(),
         )
     )
     home.commands = Commands(
@@ -189,10 +188,22 @@ def test_trv_fall_that_shows_in_the_room_is_a_window(clock):
     assert _with_room_sensor(home, 17.5, 18.3) == 12.0
 
 
-def test_trv_with_valve_info_is_judged_by_its_own_sensor(clock):
+def test_trv_sensor_falling_while_the_room_warms_is_not_a_window_even_with_valve_info(clock):
     home = Home(clock)
     home.room_history = []
     for _ in range(15):
-        _with_room_sensor(home, 19.0, 19.0, valve_known=True)
-    # Valve was closed (not cooling), TRV falls, the stepped room sensor has not moved yet.
-    assert _with_room_sensor(home, 17.5, 19.0, valve_known=True) == 12.0
+        _with_room_sensor(home, 20.3, 18.0)
+    for trv in (19.7, 19.0, 18.6):  # valve open: some valve sensors fall while heating
+        target = _with_room_sensor(home, trv, 18.5)
+    assert target == 19.5
+
+
+def test_a_room_sensor_with_nothing_new_to_report_does_not_confirm_a_window(clock):
+    home = Home(clock)
+    home.room_history = []
+    for _ in range(15):
+        _with_room_sensor(home, 19.0, 19.0)
+    home.room_history = [SensorReading(19.0, home.clock.now())]
+    clock.advance(minutes=16)  # its only reading is older than the detection period
+    home.history.append(SensorReading(19.0, clock.now()))
+    assert _with_room_sensor(home, 17.5, 19.0) == 19.5

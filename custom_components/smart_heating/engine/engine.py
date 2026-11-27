@@ -135,7 +135,13 @@ def decide(inp: EngineInput) -> Decision:
     external_rooms: set[str] = set()
     for room in inp.config.rooms:
         temp, external = select_temperature(
-            room, inp.external_temps, inp.trv_temps, inp.now, inp.config.sensors, inp.learned_offsets
+            room,
+            inp.external_temps,
+            inp.trv_temps,
+            inp.now,
+            inp.config.sensors,
+            inp.learned_offsets,
+            inp.calibrated,
         )
         if temp is None:
             continue
@@ -160,7 +166,9 @@ def decide(inp: EngineInput) -> Decision:
     }
     for room_name in hand_set:
         reasons[room_name] = "manual"
-    calling = demand_rooms(inp.config, trv_setpoints, room_temps, hand_set, inp.coast, inp.settling)
+    calling = demand_rooms(
+        inp.config, trv_setpoints, room_temps, hand_set, inp.coast, inp.settling, inp.resting
+    )
     capping = _open_radiators_capping(inp, room_temps)
     if capping:
         calling = ()  # a room with open radiators is warm enough: stop heating the whole house

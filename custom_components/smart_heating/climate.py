@@ -74,6 +74,12 @@ class RoomClimate(CoordinatorEntity[SmartHeatingCoordinator], ClimateEntity):
     async def async_cancel_boost(self) -> None:
         await cancel_boost(self._shared, self._room)
 
+    async def async_calibrate(self, temperature: float) -> None:
+        await self.coordinator.async_calibrate(self._room, temperature)
+
+    async def async_clear_calibration(self) -> None:
+        await self.coordinator.async_clear_calibration(self._room)
+
     @property
     def hvac_action(self) -> HVACAction | None:
         """Heating while this Room actually calls the boiler (see status.room_heating)."""
@@ -101,3 +107,7 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         "async_boost",
     )
     platform.async_register_entity_service("cancel_boost", None, "async_cancel_boost")
+    platform.async_register_entity_service(
+        "calibrate", {vol.Required("temperature"): vol.Coerce(float)}, "async_calibrate"
+    )
+    platform.async_register_entity_service("clear_calibration", None, "async_clear_calibration")

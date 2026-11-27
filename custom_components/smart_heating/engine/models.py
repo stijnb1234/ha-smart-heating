@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
 from typing import Literal
 
+from .calibration import Offset
 from .overrides import Boost, ManualRoomOverride
 
 # Float comparison tolerance for thresholds.
@@ -194,8 +195,6 @@ class EngineInput:
     # Rooms whose radiator is cooling down after heating: their TRV sensor falls although the
     # Room does not, so window detection only trusts the external sensor there.
     cooling_rooms: frozenset[str] = frozenset()
-    # Rooms whose TRV reports its valve or heating demand: its sensor is then judged by the valve state.
-    valve_known: frozenset[str] = frozenset()
     # Learned per Room (see insights.py): open-window drop, extra rise after a call ends, and
     # external-minus-TRV sensor offset. Missing while there is too little data.
     window_thresholds: Mapping[str, float] = field(default_factory=dict)
@@ -204,8 +203,12 @@ class EngineInput:
     # they do not call again until the temperature has peaked (see CoastTracker).
     settling: frozenset[str] = frozenset()
     learned_offsets: Mapping[str, float] = field(default_factory=dict)
+    # Rooms without a room sensor whose TRV sensor was calibrated by hand.
+    calibrated: Mapping[str, Offset] = field(default_factory=dict)
     # Rooms that have called for heat for a long time without warming up.
     stalled: frozenset[str] = frozenset()
+    # Stalled Rooms that do not call for heat until their next try (see StallTracker).
+    resting: frozenset[str] = frozenset()
     # Rooms whose TRV takes no external temperature (its setpoint may be corrected instead).
     trv_without_external: frozenset[str] = frozenset()
 

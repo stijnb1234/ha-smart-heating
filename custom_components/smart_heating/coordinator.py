@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -35,10 +36,12 @@ from .const import (
 )
 from .controller import Controller, Cycle, Snapshot
 from .engine import Commands, SensorConfig, SensorReading
+from .engine.calibration import CalibrationError
 from .engine.window import recent_drop, window_history
 from .gather import battery_is_low, parse_number
+from .i18n import tr
 from .presence_adapter import PresenceAdapter, is_arriving
-from .rooms import absent_rooms
+from .rooms import absent_rooms, calibratable_rooms
 from .settings import build_engine_config
 from .trv_adapter import TrvAdapter
 from .vacation_plan import parse_keywords, periods_from_events
@@ -47,7 +50,9 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant, State
 
+    from .calibration_store import CalibrationStore
     from .commands_store import CommandsStore
+    from .engine.calibration import Calibration
     from .engine.insights import RoomInsights
     from .engine.learner import LeadTimeLearner
     from .insights_store import InsightsStore
@@ -81,6 +86,8 @@ class Persistence:
     commands_store: CommandsStore
     insights_store: InsightsStore
     insights: RoomInsights
+    calibration_store: CalibrationStore
+    calibration: Calibration
     restored: Commands
     away_since: datetime | None
 
@@ -109,8 +116,14 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
         config = build_engine_config(shared["rooms"], opts)
         self._battery_low_percent = config.alerts.battery_low_percent
         self.controller = Controller(
-            config, persistence.learner, shared["boosts"], shared["manual_overrides"], persistence.insights
+            config,
+            persistence.learner,
+            shared["boosts"],
+            shared["manual_overrides"],
+            persistence.insights,
+            persistence.calibration,
         )
+        self._calibration_asked: frozenset[str] = frozenset()
         self._insights_saved = dt_util.utcnow()
         self._insights_pending = False
         self.trv_devices = trv_devices
@@ -153,6 +166,46 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
     @property
     def learner(self) -> LeadTimeLearner:
         return self._p.learner
+
+    def _check_calibratable(self, room: str) -> None:
+        names = calibratable_rooms(self._shared["rooms"], self._shared["sensor_entities"], self.trv_devices)
+        if room not in names:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="calibration_not_possible")
+
+    async def async_calibrate(self, room: str, reading: float) -> None:
+        """Record what a thermometer in `room` reads right now (number entity and action)."""
+        self._check_calibratable(room)
+        try:
+            state = self.controller.calibrate(room, reading)
+        except CalibrationError as err:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key=err.key) from err
+        _LOGGER.info("Calibration for %s: thermometer %.1f with the radiator %s", room, reading, state)
+        await self._p.calibration_store.async_save(self.controller.calibration)
+        await self.async_request_refresh()
+
+    async def async_clear_calibration(self, room: str) -> None:
+        self._check_calibratable(room)
+        self.controller.clear_calibration(room)
+        await self._p.calibration_store.async_save(self.controller.calibration)
+        await self.async_request_refresh()
+
+    async def _ask_for_calibration(self) -> None:
+        """A notification while a half-calibrated Room's radiator is in the missing state."""
+        wanted = dict(self.controller.calibration_requests())
+        for room in self._calibration_asked - wanted.keys():
+            await self._notification("dismiss", room)
+        for room in wanted.keys() - self._calibration_asked:
+            await self._notification(
+                "create",
+                room,
+                title=tr(self.lang, "calibration.title"),
+                message=tr(self.lang, f"calibration.ask_{wanted[room]}", room=room),
+            )
+        self._calibration_asked = frozenset(wanted)
+
+    async def _notification(self, service: str, room: str, **data: str) -> None:
+        data["notification_id"] = f"{DOMAIN}_calibration_{room}"
+        await self.hass.services.async_call("persistent_notification", service, data)
 
     def _reading(self, entity_id: str | None, attr: str | None = None) -> SensorReading | None:
         state = self.hass.states.get(entity_id) if entity_id else None
@@ -316,6 +369,7 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
                 ("external temperature", push),
                 ("boiler", boiler),
                 ("alerts", lambda: self.alerts.async_apply(decision.alerts)),
+                ("calibration request", self._ask_for_calibration),
             ],
             _LOGGER,
         )

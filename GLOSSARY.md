@@ -39,6 +39,11 @@ OpenTherm) are further adapters.
 is colder than its target by more than the **demand hysteresis**, or while a Manual-room override
 runs.
 
+**Stalled Room**: A Room whose call for heat gets nowhere, for instance through a stuck valve or
+an open window: no warming for 45 minutes (floor heating: 3 hours), or, except with floor heating,
+a rise over 2 hours too slow to reach its target within 6 hours. It stops calling for 3 hours,
+then tries again, until it warms fast enough or no longer needs heat. A Boost makes it try at once.
+
 **Demand hysteresis**: How far below its target a Room must be before it calls for heat, widened
 by its learned **coast**. A Room can have its own hysteresis (for a coarse sensor); otherwise the
 global one applies.
@@ -97,3 +102,18 @@ own sensor falls anyway, so only the external room sensor is trusted then.
 
 **Schedule suggestion**: A recurring Boost or hand-set valve at a time the schedule does not cover,
 reported weekly. The schedule is never changed by itself.
+
+## Advice (planned, see `.scratch/`)
+
+**Advice**: A recurring pattern that wastes gas or comfort, with how to solve it, offered to the
+administrator. Applied only on request, and can be snoozed, dismissed or undone.
+
+**Diagnosis**: All current problems of one Room combined into a likely cause and steps to solve it.
+
+**Calibration**: Thermometer readings entered by hand that correct a TRV's temperature, separately
+for a cold and a heating radiator.
+
+**Digest**: The weekly message with a gas verdict, the top Advice and the effect of applied Advice.
+It replaces the weekly report.
+
+**Frost risk**: A Room close to frost-hold that is not warming.

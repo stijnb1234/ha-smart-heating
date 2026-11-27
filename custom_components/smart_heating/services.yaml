@@ -15,6 +15,29 @@ cancel_boost:
       integration: smart_heating
       domain: climate
 
+calibrate:
+  target:
+    entity:
+      integration: smart_heating
+      domain: climate
+  fields:
+    temperature:
+      required: true
+      example: 19.5
+      selector:
+        number:
+          min: 0
+          max: 40
+          step: 0.1
+          unit_of_measurement: "°C"
+          mode: box
+
+clear_calibration:
+  target:
+    entity:
+      integration: smart_heating
+      domain: climate
+
 set_vacation:
   fields:
     start:

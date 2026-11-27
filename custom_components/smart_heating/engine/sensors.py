@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 
+from .calibration import Offset
 from .models import RoomConfig, SensorConfig, SensorReading
 
 
@@ -15,18 +16,21 @@ def select_temperature(
     now: datetime,
     cfg: SensorConfig,
     learned_offsets: Mapping[str, float] | None = None,
+    calibrated: Mapping[str, Offset] | None = None,
 ) -> tuple[float | None, bool]:
     """Return (room temperature, whether it came from the external sensor).
 
     A fresh external sensor wins; otherwise a fresh TRV reading plus the Room's
-    offset (the learned external-minus-TRV offset when none is configured);
-    otherwise None (stale readings are not trusted).
+    offset: the calibrated one, else the configured one, else the learned
+    external-minus-TRV offset; otherwise None (stale readings are not trusted).
     """
     ext = external.get(room.name)
     if ext is not None and now - ext.at < cfg.external_stale_after:
         return ext.value, True
     reading = trv.get(room.name)
     if reading is not None and now - reading.at < cfg.trv_stale_after:
+        if calibrated and room.name in calibrated:
+            return reading.value + calibrated[room.name].current, False
         offset = room.trv_offset or (learned_offsets or {}).get(room.name, 0.0)
         return reading.value + offset, False
     return None, False

@@ -181,3 +181,48 @@ async def test_cancel_boiler_hold_service_and_button(hass):
         await hass.async_block_till_done()
         hold = controller.commands.boiler_hold_until
         assert hold is None or hold <= dt_util.utcnow()
+
+
+async def test_calibration_is_offered_only_without_a_room_sensor(hass):
+    from datetime import timedelta as delta
+
+    import pytest
+    from homeassistant.exceptions import ServiceValidationError
+
+    from .conftest import OPTIONS
+
+    bare = {k: v for k, v in ROOMS[0].items() if k != "sensor_entity"}
+    set_home(hass)
+    await setup_entry(hass, {**OPTIONS, "rooms": [bare]})
+    assert hass.states.get("number.smart_heating_bed_thermometer") is not None
+
+    entry = hass.data[DOMAIN]["e1"]
+    controller = entry["coordinator"].controller
+    # Pretend the radiator has been watched, cold, for two hours.
+    controller._warmth.observe("Bedroom", dt_util.now() - delta(hours=2), False)
+    controller._warmth._state["Bedroom"] = (dt_util.now() - delta(hours=2), dt_util.now(), False, 0.0)
+    await hass.services.async_call(
+        DOMAIN, "calibrate", {"entity_id": "climate.smart_heating_bed", "temperature": 17.5}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert controller.calibration.states("Bedroom") == {"cold"}
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            "number", "set_value", {"entity_id": "number.smart_heating_bed_thermometer", "value": 40}, blocking=True
+        )
+
+    await hass.services.async_call(DOMAIN, "clear_calibration", {"entity_id": "climate.smart_heating_bed"}, blocking=True)
+    assert controller.calibration.states("Bedroom") == frozenset()
+
+
+async def test_calibration_is_refused_for_a_room_with_a_sensor(hass):
+    import pytest
+    from homeassistant.exceptions import ServiceValidationError
+
+    set_home(hass)
+    await setup_entry(hass)
+    assert hass.states.get("number.smart_heating_bed_thermometer") is None
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, "calibrate", {"entity_id": "climate.smart_heating_bed", "temperature": 17.5}, blocking=True
+        )
