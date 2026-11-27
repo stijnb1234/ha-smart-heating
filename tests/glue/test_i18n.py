@@ -2,11 +2,10 @@ from datetime import UTC, datetime
 from typing import get_args
 
 from custom_components.smart_heating.dashboard import build_dashboard
-from custom_components.smart_heating.engine import Alert
 from custom_components.smart_heating.engine.models import Reason
 from custom_components.smart_heating.explain import Explanation, summarize
 from custom_components.smart_heating.i18n import CATALOG, number, pick_language, tr
-from custom_components.smart_heating.status import alert_sentence, status_text
+from custom_components.smart_heating.status import diagnosis_sentence, status_text
 
 NOW = datetime(2026, 10, 17, 10, 0, tzinfo=UTC)
 
@@ -33,7 +32,7 @@ def test_dutch_sentences_and_numbers():
     assert summarize(e, NOW, "en") == "Warm from Mon 08:50"
     assert summarize(Explanation("away", 16.5, None), NOW, "nl") == "Niemand thuis, op 16,5 graden gehouden"
     assert status_text(("Werkkamer",), True, False, False, "nl") == "Verwarmen: Werkkamer. Boiler aan."
-    assert "Werkkamer" in alert_sentence(Alert("trv_offline", "Werkkamer"), "nl")
+    assert "Werkkamer" in diagnosis_sentence("valve_unreachable", "Werkkamer", "nl")
 
 
 def test_every_reason_has_a_dutch_sentence_in_the_dutch_help():

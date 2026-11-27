@@ -10,17 +10,19 @@ from homeassistant.const import UnitOfTemperature, UnitOfTime
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from .advice_actions import advice_text
 from .const import DOMAIN
 from .coordinator import SmartHeatingCoordinator
 from .dashboard import entity_id
 from .engine import RoomConfig
+from .engine.diagnosis import diagnose
 from .explain import summarize
 from .i18n import tr
 from .status import (
-    alert_sentence,
     backoff_text,
     boiler_status,
     demand_text,
+    diagnosis_sentence,
     heating_rooms,
     hold_text,
     status_text,
@@ -157,13 +159,36 @@ class ActiveAlertsSensor(_SystemSensor):
 
     @property
     def native_value(self) -> int | None:
-        return len(self._alerts) if self.coordinator.data else None
+        return len(diagnose(self._alerts)) if self.coordinator.data else None
 
     @property
     def extra_state_attributes(self) -> dict:
         return {
-            "messages": [alert_sentence(a, self.coordinator.lang) for a in self._alerts],
+            "messages": [
+                diagnosis_sentence(d.cause, d.room, self.coordinator.lang) for d in diagnose(self._alerts)
+            ],
             "alerts": [{"code": a.code, "room": a.room} for a in self._alerts],
+        }
+
+
+class AdviceSensor(_SystemSensor):
+    """Open advice, read-only: acting on it happens under Settings > Repairs."""
+
+    key = "advice"
+
+    @property
+    def native_value(self) -> int:
+        return len(self.coordinator.advisor.current)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        advisor = self.coordinator.advisor
+        lang, names = self.coordinator.lang, advisor.names()
+        return {
+            "messages": [
+                advice_text(a, lang, advisor.state.cost_per_hour, names, advisor.state.currency)
+                for a in advisor.current
+            ]
         }
 
 
@@ -242,6 +267,7 @@ class BoilerManualHoldSensor(_SystemSensor):
 SYSTEM_SENSORS = (
     StatusSensor,
     ActiveAlertsSensor,
+    AdviceSensor,
     BoilerDemandSensor,
     BoilerTargetSensor,
     BoilerLastWriteSensor,

@@ -184,6 +184,70 @@ class RadiatorWarmth:
         return "cold" if not hot and warmth <= EPSILON else None
 
 
+# A Room within this much of frost-hold that has not warmed for FROST_AFTER is at risk.
+FROST_BAND = 1.0
+FROST_AFTER = timedelta(hours=1)
+
+
+class FrostTracker:
+    """Rooms near frost-hold that are not getting warmer."""
+
+    def __init__(self) -> None:
+        self._since: dict[str, tuple[datetime, float]] = {}  # (since, lowest temp seen)
+        self._at_risk: set[str] = set()
+
+    def observe(self, room: str, now: datetime, temp: float | None, frost_hold: float) -> None:
+        if temp is None or temp > frost_hold + FROST_BAND:
+            self._since.pop(room, None)
+            self._at_risk.discard(room)
+            return
+        since, low = self._since.get(room, (now, temp))
+        if temp >= low + STALL_RISE - EPSILON:
+            since, low = now, temp
+            self._at_risk.discard(room)
+        self._since[room] = (since, min(low, temp))
+        if now - since >= FROST_AFTER:
+            self._at_risk.add(room)
+
+    def at_risk(self) -> frozenset[str]:
+        return frozenset(self._at_risk)
+
+
+LEAK_RISE = 1.0  # K within LEAK_PERIOD
+LEAK_PERIOD = timedelta(minutes=30)
+LEAK_MARGIN = 0.5  # this far above the valve's setpoint it should be shut
+LEAK_QUIET = timedelta(hours=1)  # after the Room's own call its radiator is still warm
+
+
+class LeakTracker:
+    """Rooms that warm up on other Rooms' calls although their valve should be closed."""
+
+    def __init__(self) -> None:
+        self._readings: dict[str, deque[tuple[datetime, float]]] = {}
+        self._own_call: dict[str, datetime] = {}
+        self._reported: set[str] = set()
+
+    def observe(
+        self, room: str, now: datetime, temp: float | None, setpoint: float, calling: bool, boiler_on: bool
+    ) -> bool:
+        """True once per stretch in which the Room warmed up while it should not."""
+        if calling:
+            self._own_call[room] = now
+        quiet = room not in self._own_call or now - self._own_call[room] >= LEAK_QUIET
+        if temp is None or not boiler_on or not quiet or temp <= setpoint + LEAK_MARGIN:
+            self._readings.pop(room, None)
+            self._reported.discard(room)
+            return False
+        readings = self._readings.setdefault(room, deque())
+        readings.append((now, temp))
+        while now - readings[0][0] > LEAK_PERIOD:
+            readings.popleft()
+        if room in self._reported or temp - min(t for _, t in readings) < LEAK_RISE - EPSILON:
+            return False
+        self._reported.add(room)
+        return True
+
+
 # Long enough for the remaining fall to stay below the lowest learned window threshold (0.5 K).
 RADIATOR_COOLDOWN = timedelta(minutes=60)
 

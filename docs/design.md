@@ -21,13 +21,13 @@ HA states ──> coordinator ──> Snapshot ──> Controller ──> engine
 
 | Part | Module(s) | Role |
 |---|---|---|
-| Engine | `engine/` | Target per Room by precedence (Boost > window pause > Vacation > Away > schedule with pre-heat > setback), boiler call with debounce/backoff/manual hold, TRV lost-write and hand-change detection, alerts. Pure, tested with a fake clock. |
+| Engine | `engine/` | Target per Room by precedence (Boost > window pause > Vacation > Away > schedule with pre-heat > setback), boiler call with debounce/backoff/manual hold, TRV lost-write and hand-change detection, alerts, diagnoses and advice detection. Pure, tested with a fake clock. |
 | Controller | `controller.py` | State that lives between cycles: temperature history, unmet tracking, away start, lead times, radiator cooldown, learning (warm-ups, coast, window noise, sensor offset, habits). Pure. |
 | Presence | `arrival.py`, `presence_adapter.py` | Home, away, heading home from GPS (ADR-0007). |
 | Vacation | `vacation_plan.py`, `vacation.py` | Manual and calendar periods with an exact return (ADR-0007). |
 | Hardware | `boiler_adapter.py`, `trv_adapter.py`, `trv_devices.py` | Boiler call and TRVs behind adapters; TRV extras discovered on the device (ADR-0006). |
 | Config | `config_flow.py`, `rooms.py`, `settings.py`, `migration.py` | Options flow, Room validation and stable ids, config entry migrations. |
-| Insight | `explain.py`, `status.py`, `dashboard.py`, `report*.py`, `diagnostics.py` | Plain-language sentences, generated dashboard (ADR-0005), weekly report, diagnostics. |
+| Insight | `explain.py`, `status.py`, `dashboard.py`, `advice*.py`, `advisor.py`, `repairs.py`, `report*.py`, `diagnostics.py` | Plain-language sentences, generated dashboard (ADR-0005), advice in Repairs (ADR-0008), weekly digest, diagnostics. |
 
 ## Defaults
 

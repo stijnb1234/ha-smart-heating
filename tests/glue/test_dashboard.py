@@ -110,9 +110,9 @@ def test_overview_has_status_rooms_alerts_controls_but_no_technical_boiler_detai
 def test_alerts_card_only_shown_when_alerts_exist():
     cards = cards_of(view(build_dashboard(ROOMS), "overview"))
     cond = [c for c in cards if c["type"] == "conditional"]
-    assert len(cond) == 1
-    assert cond[0]["conditions"] == [
-        {"entity": "sensor.smart_heating_active_alerts", "state_not": "0"}
+    assert [c["conditions"][0] for c in cond] == [
+        {"entity": "sensor.smart_heating_active_alerts", "state_not": "0"},
+        {"entity": "sensor.smart_heating_advice", "state_not": "0"},
     ]
 
 

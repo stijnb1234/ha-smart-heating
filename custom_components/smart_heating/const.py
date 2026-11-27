@@ -3,6 +3,7 @@ CONF_ROOMS = "rooms"
 CONF_GAS_ENTITY = "gas_entity"
 CONF_OUTDOOR_ENTITY = "outdoor_entity"
 CONF_HDD_BASE = "hdd_base"
+CONF_GAS_PRICE = "gas_price"
 CONF_BOILER_ENTITY = "boiler_entity"
 CONF_PERSONS = "persons"
 CONF_ARRIVAL_ENTITIES = "arrival_entities"
@@ -55,7 +56,5 @@ DEFAULT_VACATION_KEYWORDS = "vacation, holiday, vakantie"
 # TRVs on Zigbee2MQTT without an external-temperature number entity get it over MQTT.
 CONF_Z2M_BASE_TOPIC = "z2m_base_topic"
 
-# Alerts pushed to notify services (phones) once they have lasted this long.
+# Urgent alerts and the weekly digest are also sent to these notify services (phones).
 CONF_NOTIFY_TARGETS = "notify_targets"
-CONF_NOTIFY_DELAY_MINUTES = "notify_delay_minutes"
-DEFAULT_NOTIFY_DELAY_MINUTES = 15

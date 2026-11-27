@@ -16,20 +16,19 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .advisor import Advisor
 from .alerts_adapter import AlertAdapter
 from .apply import run_isolated
 from .boiler_adapter import make_boiler_adapter
 from .const import (
     CONF_ARRIVAL_ENTITIES,
     CONF_AUTO_ARRIVAL,
-    CONF_NOTIFY_DELAY_MINUTES,
     CONF_NOTIFY_TARGETS,
     CONF_OUTDOOR_ENTITY,
     CONF_PERSONS,
     CONF_VACATION_CALENDAR,
     CONF_VACATION_KEYWORDS,
     DEFAULT_AUTO_ARRIVAL,
-    DEFAULT_NOTIFY_DELAY_MINUTES,
     DEFAULT_VACATION_KEYWORDS,
     DOMAIN,
     UPDATE_INTERVAL_SECONDS,
@@ -50,8 +49,11 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant, State
 
+    from .advice_actions import AdviceState
+    from .advice_store import AdviceStore
     from .calibration_store import CalibrationStore
     from .commands_store import CommandsStore
+    from .engine.advice import AdviceLog
     from .engine.calibration import Calibration
     from .engine.insights import RoomInsights
     from .engine.learner import LeadTimeLearner
@@ -88,6 +90,9 @@ class Persistence:
     insights: RoomInsights
     calibration_store: CalibrationStore
     calibration: Calibration
+    advice_store: AdviceStore
+    advice_log: AdviceLog
+    advice_state: AdviceState
     restored: Commands
     away_since: datetime | None
 
@@ -122,6 +127,10 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
             shared["manual_overrides"],
             persistence.insights,
             persistence.calibration,
+            persistence.advice_log,
+        )
+        self.advisor = Advisor(
+            hass, entry, shared, self.controller, persistence.advice_store, persistence.advice_state, list(trv_devices)
         )
         self._calibration_asked: frozenset[str] = frozenset()
         self._insights_saved = dt_util.utcnow()
@@ -137,12 +146,7 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
             auto_arrival=opts.get(CONF_AUTO_ARRIVAL, DEFAULT_AUTO_ARRIVAL),
             also_track=occupants,
         )
-        self.alerts = AlertAdapter(
-            hass,
-            self.lang,
-            opts.get(CONF_NOTIFY_TARGETS, []),
-            timedelta(minutes=float(opts.get(CONF_NOTIFY_DELAY_MINUTES, DEFAULT_NOTIFY_DELAY_MINUTES))),
-        )
+        self.alerts = AlertAdapter(hass, self.lang, opts.get(CONF_NOTIFY_TARGETS, []))
         self._vacation = shared["vacation"]
         self._calendar = opts.get(CONF_VACATION_CALENDAR)
         self._keywords = parse_keywords(opts.get(CONF_VACATION_KEYWORDS, DEFAULT_VACATION_KEYWORDS))
@@ -291,6 +295,10 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
             boiler_observed=self._boiler.observed_setpoint if self._boiler else None,
             absent_rooms=self._absent_rooms(now),
             trv_off=self._trv.stuck_off(),
+            people_away=tuple(
+                p for p in self._opts.get(CONF_PERSONS, [])
+                if (s := self.hass.states.get(p)) is not None and s.state not in (*_UNAVAILABLE, *_PRESENT_STATES)
+            ),
             valve_open=frozenset(valve_open),
             valve_known=frozenset(valve_known),
             trv_without_external=frozenset(
@@ -370,6 +378,7 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
                 ("boiler", boiler),
                 ("alerts", lambda: self.alerts.async_apply(decision.alerts)),
                 ("calibration request", self._ask_for_calibration),
+                ("advice", self.advisor.async_tick),
             ],
             _LOGGER,
         )
@@ -398,6 +407,7 @@ class SmartHeatingCoordinator(DataUpdateCoordinator[Cycle]):
 
     async def async_flush(self) -> None:
         """Write learned data that is waiting for its next periodic save (unload, stop)."""
+        await self.advisor.async_save()
         await self._save_insights(force=True)
         if self.controller.take_learner_dirty():
             await self._p.learner_store.async_save(self._p.learner)

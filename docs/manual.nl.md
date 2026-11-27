@@ -48,7 +48,7 @@ Dan volgt een tabel met één regel per kamer:
 
 ### Meldingen
 
-Dit blok verschijnt alleen als er iets aandacht nodig heeft, bijvoorbeeld een bijna lege batterij. Zie je het niet, dan is alles in orde. Elke melding staat er als gewone zin; verderop in deze handleiding lees je wat je ermee kunt.
+Dit blok verschijnt alleen als er iets aandacht nodig heeft, bijvoorbeeld een bijna lege batterij. Zie je het niet, dan is alles in orde. Elke kamer heeft hoogstens één regel, met wat er waarschijnlijk aan de hand is en wat je kunt doen. Alleen dringende problemen (de ketel is onbereikbaar of een kamer dreigt te bevriezen) komen ook op je telefoon, als de beheerder dat heeft ingesteld. Daaronder staat onder **Advies** hoe je gas kunt besparen.
 
 ### Bediening
 
@@ -128,7 +128,7 @@ Deze dingen gebeuren automatisch. Je hoeft er niets voor te doen.
 - **Kamers zonder slimme kranen:** die vragen om warmte als het er koud is en zetten de ketel uit zodra het warm genoeg is. Zie [Kamers zonder slimme kranen](#kamers-zonder-slimme-kranen).
 - **Een kamer die niet warmer wordt:** vraagt een kamer al driekwartier om warmte en is hij nauwelijks warmer geworden (of warmt hij na twee uur zo traag op dat het meer dan zes uur zou duren), dan krijg je een melding en stopt die kamer drie uur met warmte vragen, waarna hij het opnieuw probeert (vloerverwarming krijgt eerst drie uur de tijd). Zie [Meldingen](#meldingen-1).
 - **Kraan uitgezet:** staat een slimme radiatorkraan uit, dan zet het systeem hem vanzelf weer aan.
-- **Weekrapport:** elke maandag om 08:00 krijg je een bericht in Home Assistant (bij het belletje). Daarin staat hoeveel gas er is gebruikt vergeleken met vorig jaar, rekening houdend met hoe koud het was, hoeveel uur elke kamer verwarmd is en of er problemen waren. Heeft het systeem een gewoonte van je opgemerkt, dan staat er ook een suggestie voor het schema in.
+- **Advies en weekbericht:** het systeem let op patronen die gas verspillen. Elke maandag om 08:00 krijg je, alleen als er iets te melden is, een kort bericht (bij het belletje): of je meer of minder gas verbruikte dan vorig jaar, rekening houdend met het weer, hoogstens drie dingen die je kunt doen, en wat eerdere aanpassingen opleverden. Zie [Advies](#advies).
 
 ## Kamers zonder slimme kranen
 
@@ -165,7 +165,7 @@ Smart Heating begint met verstandige standaardwaarden en leert daarna elke kamer
 - **Wat een open raam is.** Elke kamer koelt een beetje anders af: een kamer met een groot raam daalt sneller dan een kleine slaapkamer. Na ongeveer drie uur rustige metingen weet het systeem wat voor een kamer normaal is en wat niet. Een kamer die normaal nauwelijks verandert, herkent een open raam sneller. De instelling van de beheerder voor de temperatuurdaling is het maximum: het systeem kan de kamer alerter maken dan dat, nooit minder alert.
 - **Hoever een kamer blijft opwarmen.** Een radiator blijft nog even warm nadat de ketel stopt. Het systeem meet hoeveel verder de kamer opwarmt, en zet de ketel zoveel eerder uit. Zo komt de kamer precies op zijn doel tot rust in plaats van er iets boven, wat gas bespaart. Dit leert het na minstens drie keer verwarmen, en de correctie is nooit meer dan één graad.
 - **Hoe de thermometers verschillen.** De thermometer in een radiatorkraan meet een andere waarde dan de losse thermometer midden in de kamer. Het systeem vergelijkt de twee zolang de radiator uit staat. Wordt de losse thermometer ooit stil, dan gebruikt het de waarde van de kraan, gecorrigeerd met dat verschil, in plaats van er een stukje naast te zitten. Heeft de beheerder zelf een correctie ingesteld, dan geldt die.
-- **Wat je met de hand doet.** Druk je regelmatig rond dezelfde tijd op **Boost** of draai je een kraan omhoog, buiten het schema, dan merkt het systeem dat. Is dat op minstens drie verschillende dagen binnen vier weken gebeurd, dan staat het in het maandagrapport, bijvoorbeeld *je vraagt vaak om warmte op di, do rond 07:10, overweeg dit aan het schema toe te voegen*. Het systeem past het schema nooit zelf aan, dat doe jij of de beheerder.
+- **Wat je met de hand doet.** Druk je regelmatig rond dezelfde tijd op **Boost** of draai je een kraan omhoog, buiten het schema, dan merkt het systeem dat. Is dat op minstens drie verschillende dagen binnen vier weken gebeurd, dan stelt het voor die tijd aan het schema toe te voegen (zie [Advies](#advies)). Het systeem past het schema nooit zelf aan.
 
 ## De knoppen
 
@@ -199,18 +199,29 @@ De ketel blijft dan twee uur lang branden. Ben je eerder klaar, druk dan op **Ha
 
 ## Meldingen
 
-Een melding verschijnt alleen als er echt iets aandacht nodig heeft. Heeft de beheerder het ingesteld, dan komen meldingen die even duren ook op je telefoon binnen, met een bericht zodra ze zijn opgelost. Hij verdwijnt vanzelf zodra het probleem is opgelost. In de meldingen staat de naam van de kamer; hieronder staat *de kamer*.
+Een regel verschijnt alleen als er echt iets aandacht nodig heeft, en verdwijnt vanzelf zodra het probleem is opgelost. Meerdere verschijnselen in één kamer worden samengevat tot de waarschijnlijkste oorzaak; hieronder staat *de kamer* voor de naam.
 
-| Melding | Wat je kunt doen |
+| Probleem | Wat je kunt doen |
 | --- | --- |
-| De batterij van de radiatorkraan in de kamer is bijna leeg. | Vervang de batterijen binnenkort. De kraan werkt tot die tijd gewoon door. |
-| De radiatorkraan in de kamer reageert niet. | Kijk of de batterij leeg is of de kraan los zit. Helpt dat niet, laat het de beheerder weten. |
-| De radiatorkraan in de kamer staat uit en gaat niet weer aan. | Het systeem probeerde de kraan aan te zetten, maar dat lukte niet. Kijk op de kraan zelf of laat het de beheerder weten. |
-| De radiatorkraan in de kamer neemt zijn temperatuur niet over. | De kraan kreeg een paar keer een temperatuur, maar nam die niet over. Vaak helpt nieuwe batterijen plaatsen. |
-| De temperatuursensor in de kamer meldt niets meer. | De losse thermometer in die kamer is stil. Kijk of de batterij leeg is. Tot die tijd gebruikt het systeem de thermometer in de radiatorkraan. |
-| De kamer vraagt steeds om warmte maar wordt nauwelijks warmer. | Mogelijk staat een raam open of werkt de radiator niet. Controleer beide. Tot de kamer weer opwarmt, wordt de ketel er maar om de paar uur voor aangezet (een Boost probeert het meteen opnieuw). |
-| De kamer is al lange tijd te koud en haalt zijn doel niet. | Kijk of er een raam of deur openstaat en of de radiator warm wordt. Blijft het zo, laat het de beheerder weten. |
-| De ketelthermostaat is onbereikbaar. | De ketel kan even niet betrouwbaar worden aangestuurd. De radiatorkranen volgen gewoon het schema. Meestal lost dit zichzelf op. |
+| Kans op bevriezing: de kamer zit vlak bij de vorstbescherming en warmt niet op. **Dringend** | Sluit ramen en deuren, controleer de radiatorkraan en voel of de radiator warm wordt. |
+| De ketelthermostaat is onbereikbaar. **Dringend** | Controleer stroom en verbinding. De radiatorkranen volgen gewoon het schema. |
+| De radiatorkraan reageert niet. | Vervang de batterijen. Helpt dat niet, laat het de beheerder weten. |
+| De radiatorkraan blijft uit. | Kijk op de kraan naar een kinderslot of foutmelding en vervang de batterijen. |
+| De radiatorkraan neemt zijn temperatuur niet over. | Nieuwe batterijen helpen vaak; anders moet de kraan opnieuw gemonteerd of vervangen worden. |
+| De kamer vraagt warmte maar blijft koud. | Controleer op een open raam, en of de radiator warm wordt en niet bedekt is. Tot de kamer opwarmt, wordt de ketel er maar om de paar uur voor aangezet (een Boost probeert het meteen opnieuw). |
+| De kamer blijft te koud. | Controleer ramen, deuren en de radiator. Blijft het zo, laat het de beheerder weten. |
+| De batterij van de radiatorkraan is bijna leeg. | Vervang de batterijen binnenkort. |
+| De temperatuursensor meldt niets meer. | Controleer de batterij. Tot die tijd wordt de thermometer in de radiatorkraan gebruikt. |
+
+## Advies
+
+Advies gaat over patronen over dagen of weken, zoals een radiator die warmt terwijl hij dicht hoort, één kamer die in zijn eentje de ketel aanhoudt, of een warme periode die vaak voor niemand is. De beheerder vindt het onder **Instellingen → Reparaties** en beslist wat er gebeurt:
+
+- **Deze aanpassing toepassen** (alleen bij voorstellen voor het schema of de personen van een kamer).
+- **Herinner me over vier weken**, of *Negeren* om het nooit meer te zien.
+- **Laatste adviesaanpassing ongedaan maken** zet binnen vier weken de oude instellingen terug.
+
+Het duurt één tot drie weken aan gegevens voordat de meeste adviezen kunnen verschijnen.
 
 ## Zelf iets verstellen
 
@@ -238,7 +249,7 @@ De kamer koelde ineens snel af, bijvoorbeeld door een deur die openstond. Na hoo
 Waarschijnlijk omdat een kamer met open radiatoren (een kamer zonder slimme kranen) al warm genoeg is. Zolang die kamer op zijn comforttemperatuur is, blijft de ketel voor het hele huis uit, zodat niets te warm wordt. Zie [Kamers zonder slimme kranen](#kamers-zonder-slimme-kranen). Heb je haast? Gebruik de **Handmatige ruimte-override**.
 
 **Past het systeem mijn schema zelf aan?**
-Nee. Het leert hoe je huis zich gedraagt en kan in het maandagrapport een schematijd voorstellen, maar het verandert het schema nooit zelf.
+Nee. Het leert hoe je huis zich gedraagt en kan een wijziging voorstellen, maar er verandert niets totdat de beheerder die toepast.
 
 **Hoe lang duurt het voor het mijn huis kent?**
 De eerste dingen, zoals een open raam, werken na een paar uur. Op tijd opwarmen en de ketel op tijd uitzetten worden beter in de eerste weken. Tot die tijd gelden de standaardwaarden, dus je zit er niet slechter mee.

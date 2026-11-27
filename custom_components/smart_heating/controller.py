@@ -22,13 +22,16 @@ from .engine import (
     SensorReading,
     WriteResult,
     decide,
+    in_window,
     select_temperature,
     track_unmet,
     wants_comfort,
 )
+from .engine.advice import AdviceLog, Observation
 from .engine.alerts import thermostat_outage
 from .engine.boiler import demand_margins, wanted_targets
 from .engine.calibration import Calibration, CalibrationError, Offset, RadiatorState
+from .engine.diagnosis import diagnose
 from .engine.insights import RoomInsights, Suggestion
 from .engine.learner import LeadTimeLearner
 from .engine.overrides import manual_override_active
@@ -37,6 +40,8 @@ from .engine.trackers import (
     STALL_AFTER,
     STALL_AFTER_FLOOR,
     CoastTracker,
+    FrostTracker,
+    LeakTracker,
     RadiatorCooldown,
     RadiatorWarmth,
     StallTracker,
@@ -73,6 +78,7 @@ class Snapshot:
     trv_without_external: frozenset[str] = frozenset()
     valve_known: frozenset[str] = frozenset()
     valve_open: frozenset[str] = frozenset()  # Rooms whose TRV reports an open valve or heating demand
+    people_away: tuple[str, ...] = ()  # tracked people who are not home
 
 
 @dataclass(frozen=True)
@@ -92,12 +98,17 @@ class Controller:
         manual_overrides: Mapping[str, ManualRoomOverride],
         insights: RoomInsights | None = None,
         calibration: Calibration | None = None,
+        advice_log: AdviceLog | None = None,
     ) -> None:
         self._config = config
         self._learner = learner
         self.insights = insights or RoomInsights()
         self.insights_dirty = False
         self.calibration = calibration or Calibration()
+        self.advice_log = advice_log or AdviceLog()
+        self._frost = FrostTracker()
+        self._leak = LeakTracker()
+        self._in_window: dict[str, bool] = {}
         self._warmth = RadiatorWarmth()
         self._snapshot: Snapshot | None = None
         # Rooms with a room sensor: calibration is for TRV readings only.
@@ -298,6 +309,7 @@ class Controller:
             learned_offsets=offsets,
             stalled=self._stall.stalled(),
             resting=self._stall.resting(snap.now),
+            frost_risk=self._frost.at_risk(),
             trv_without_external=snap.trv_without_external,
             calibrated=calibrated,
         )
@@ -305,6 +317,7 @@ class Controller:
         self._last = (decision, inp.coast)
         self._freeze_preheat_leads(decision, lead_times)
         self._learn_insights(snap, inp, decision)
+        self._collect_evidence(snap, inp, decision)
         for room in rooms:
             warm = self._warmups.observe(
                 room.name,
@@ -395,6 +408,47 @@ class Controller:
                 self.insights_dirty = True
         self._record_wishes(snap, decision)
         self._observe_radiators(now, decision, snap)
+
+    def _collect_evidence(self, snap: Snapshot, inp: EngineInput, decision: Decision) -> None:
+        """What advice is later built from, and the diagnoses that recur."""
+        now = snap.now
+        calling = decision.demand_rooms
+        boiler_on = bool(calling) or manual_override_active(self._overrides, now)
+        margins = demand_margins(self._config, inp.coast)
+        observations = []
+        for room in self._config.rooms:
+            name = room.name
+            temp = decision.room_temps.get(name)
+            reason = decision.reasons[name]
+            self._frost.observe(name, now, temp, room.frost_hold)
+            scheduled = in_window(room, now)
+            started = scheduled and self._in_window.get(name) is False
+            self._in_window[name] = scheduled
+            hand = decision.hand_set.get(name)
+            observations.append(
+                Observation(
+                    room=name,
+                    scheduled=scheduled,
+                    away=reason in ("away", "occupant_away"),
+                    lowered=scheduled and hand is not None and hand < room.comfort - 0.4,
+                    calling=name in calling,
+                    sole=calling == (name,),
+                    preheating=reason == "pre_heat",
+                    late=started
+                    and reason == "schedule"
+                    and temp is not None
+                    and temp < room.comfort - margins[name] - 0.2,
+                    leaked=self._leak.observe(
+                        name, now, temp, decision.trv_setpoints[name], name in calling, boiler_on
+                    ),
+                    people_away=snap.people_away,
+                )
+            )
+        self.advice_log.observe(now, boiler_on, observations)
+        for found in diagnose(decision.alerts):
+            if found.room is not None and not found.urgent:
+                self.advice_log.record_fault(found.room, found.cause, now)
+        self.advice_log.prune(now.date())
 
     def _observe_radiators(self, now: datetime, decision: Decision, snap: Snapshot) -> None:
         """A radiator is hot while the boiler runs and its Room is below target (valve open)."""

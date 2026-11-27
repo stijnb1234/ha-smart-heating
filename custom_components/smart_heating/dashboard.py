@@ -32,6 +32,12 @@ def entity_id(domain: str, room: str | None, key: str | None = None) -> str:
 STATUS = entity_id("sensor", None, "status")
 ALERTS = entity_id("sensor", None, "active_alerts")
 
+ADVICE = entity_id("sensor", None, "advice")
+ADVICE_CONTENT = (
+    "{% for m in state_attr('sensor.smart_heating_advice', 'messages') or [] %}"
+    "- {{ m }}\n"
+    "{% endfor %}"
+)
 ALERTS_CONTENT = (
     "{% for m in state_attr('sensor.smart_heating_active_alerts', 'messages') or [] %}"
     "- {{ m }}\n"
@@ -143,6 +149,19 @@ def _overview_view(rooms: list[dict[str, Any]], lang: str) -> dict[str, Any]:
             },
         }
     )
+    advice = _section(
+        {
+            "type": "conditional",
+            "conditions": [{"entity": ADVICE, "state_not": "0"}],
+            "card": {
+                "type": "vertical-stack",
+                "cards": [
+                    _heading(tr(lang, "dash.advice"), "mdi:lightbulb-on-outline"),
+                    {"type": "markdown", "content": ADVICE_CONTENT},
+                ],
+            },
+        }
+    )
     boosts = []
     for r in rooms:
         boosts += [
@@ -175,7 +194,7 @@ def _overview_view(rooms: list[dict[str, Any]], lang: str) -> dict[str, Any]:
         "icon": "mdi:home-thermometer",
         "type": "sections",
         "max_columns": 2,
-        "sections": [now, alerts, controls],
+        "sections": [now, alerts, advice, controls],
     }
 
 

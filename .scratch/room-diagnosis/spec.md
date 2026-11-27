@@ -1,6 +1,6 @@
 # Release B: One diagnosis per Room, fewer pushes
 
-Status: ready-for-agent
+Status: resolved
 Order: 4 of 6
 
 ## Problem

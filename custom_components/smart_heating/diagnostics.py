@@ -48,6 +48,14 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
     result["insights"] = controller.insights.to_dict()
     result["lead_time_samples"] = coordinator.learner.to_dict()
     result["calibration"] = controller.calibration.to_dict()
+    # Keys and evidence totals only: the log of who was away stays out.
+    result["advice"] = {
+        "current": [a.key for a in coordinator.advisor.current],
+        "hidden": coordinator.advisor.state.hidden,
+        "days": controller.advice_log.days,
+        "faults": controller.advice_log.faults,
+        "boiler_minutes": controller.advice_log.boiler,
+    }
     vacation = shared["vacation"].planner
     result["vacation"] = {
         "manual": vacation.manual.to_dict() if vacation.manual else None,

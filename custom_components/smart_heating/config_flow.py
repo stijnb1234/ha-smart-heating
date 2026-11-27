@@ -27,9 +27,9 @@ from .const import (
     CONF_DEBOUNCE_MINUTES,
     CONF_DEMAND_HYSTERESIS,
     CONF_GAS_ENTITY,
+    CONF_GAS_PRICE,
     CONF_HDD_BASE,
     CONF_MANUAL_OVERRIDE_MINUTES,
-    CONF_NOTIFY_DELAY_MINUTES,
     CONF_NOTIFY_TARGETS,
     CONF_OUTAGE_FAILURES,
     CONF_OUTDOOR_ENTITY,
@@ -49,7 +49,6 @@ from .const import (
     DEFAULT_BOILER_LOW,
     DEFAULT_BOOST_MINUTES,
     DEFAULT_MANUAL_OVERRIDE_MINUTES,
-    DEFAULT_NOTIFY_DELAY_MINUTES,
     DEFAULT_PRE_BED_END,
     DEFAULT_PRE_BED_START,
     DEFAULT_VACATION_KEYWORDS,
@@ -77,7 +76,7 @@ from .rooms import (
 )
 from .trv_devices import DEFAULT_Z2M_BASE_TOPIC
 
-REPORT_KEYS = (CONF_GAS_ENTITY, CONF_OUTDOOR_ENTITY, CONF_HDD_BASE)
+REPORT_KEYS = (CONF_GAS_ENTITY, CONF_GAS_PRICE, CONF_OUTDOOR_ENTITY, CONF_HDD_BASE)
 HEATING_KEYS = (
     CONF_BOILER_ENTITY,
     CONF_PERSONS,
@@ -106,7 +105,6 @@ ADVANCED_KEYS = (
     CONF_SENSOR_STALE_HOURS,
     CONF_BATTERY_LOW_PERCENT,
     CONF_NOTIFY_TARGETS,
-    CONF_NOTIFY_DELAY_MINUTES,
     CONF_Z2M_BASE_TOPIC,
 )
 SETTING_KEYS = REPORT_KEYS + HEATING_KEYS + ADVANCED_KEYS
@@ -265,6 +263,9 @@ class SmartHeatingOptionsFlow(config_entries.OptionsFlow):
                 opt(CONF_GAS_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor", device_class="gas")
                 ),
+                opt(CONF_GAS_PRICE): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=10, step=0.001, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=f"{self.hass.config.currency}/m³")
+                ),
                 opt(CONF_OUTDOOR_ENTITY): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
                 ),
@@ -357,7 +358,6 @@ class SmartHeatingOptionsFlow(config_entries.OptionsFlow):
                         options=self._notify_services(), multiple=True, custom_value=True
                     )
                 ),
-                opt(CONF_NOTIFY_DELAY_MINUTES, DEFAULT_NOTIFY_DELAY_MINUTES): _number(0, 240, 5, "min"),
                 opt(CONF_Z2M_BASE_TOPIC, DEFAULT_Z2M_BASE_TOPIC): selector.TextSelector(),
             }
         )

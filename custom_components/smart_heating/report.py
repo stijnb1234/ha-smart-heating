@@ -1,4 +1,4 @@
-"""Pure weekly gas-savings report. No Home Assistant imports.
+"""Pure weekly digest: a gas verdict, what to do and what earlier changes did. No Home Assistant imports.
 
 Gas use is normalised as m3 per heating-degree-day (HDD) so a cold week and a
 mild week compare fairly, and this week is compared with the same period last year.
@@ -6,16 +6,15 @@ mild week compare fairly, and this week is compared with the same period last ye
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import datetime
+from collections.abc import Sequence
+from dataclasses import dataclass
 
-from .engine import Alert
-from .engine.insights import Suggestion
-from .i18n import DEFAULT_LANGUAGE, tr, weekday
-from .status import alert_sentence
+from .i18n import DEFAULT_LANGUAGE, number, tr
 
 DEFAULT_HDD_BASE = 18.0
+TOP_ACTIONS = 3
+# A change in gas use this large is worth a message even without anything to do.
+NOTABLE_CHANGE_PCT = 10.0
 
 
 def heating_degree_days(daily_mean_temps: Sequence[float], base: float = DEFAULT_HDD_BASE) -> float:
@@ -32,111 +31,64 @@ def m3_per_hdd(gas_m3: float | None, temps: Sequence[float], base: float) -> flo
     return gas_m3 / hdd
 
 
-def heated_hours(samples: Sequence[tuple[datetime, bool]], end: datetime) -> float:
-    """Hours heating, from chronological (time, is_heating) state changes up to `end`."""
-    total = 0.0
-    for i, (start, heating) in enumerate(samples):
-        stop = samples[i + 1][0] if i + 1 < len(samples) else end
-        if heating and stop > start:
-            total += (stop - start).total_seconds() / 3600
-    return total
-
-
-@dataclass(frozen=True)
-class Report:
-    gas_m3: float | None
-    hdd: float
-    m3_per_hdd: float | None
-    last_year_m3_per_hdd: float | None
-    room_hours: Mapping[str, float] = field(default_factory=dict)
-    issues: Sequence[str] = ()
-    suggestions: Sequence[str] = ()
-
-    @property
-    def change_pct(self) -> float | None:
-        if self.m3_per_hdd is None or not self.last_year_m3_per_hdd:
-            return None
-        return (self.m3_per_hdd / self.last_year_m3_per_hdd - 1) * 100
-
-    def format(self, lang: str = DEFAULT_LANGUAGE) -> str:
-        lines = [tr(lang, "report.title"), ""]
-        if self.m3_per_hdd is None:
-            lines.append(tr(lang, "report.no_gas"))
-        else:
-            line = tr(
-                lang, "report.gas",
-                gas=f"{self.gas_m3:.1f}", hdd=f"{self.hdd:.1f}", per=f"{self.m3_per_hdd:.2f}",
-            )
-            if self.last_year_m3_per_hdd is None:
-                line += tr(lang, "report.no_last_year")
-            else:
-                line += tr(
-                    lang, "report.vs_last_year",
-                    last=f"{self.last_year_m3_per_hdd:.2f}", pct=f"{self.change_pct:+.0f}",
-                )
-            lines.append(line)
-        lines += ["", tr(lang, "report.heated_hours")]
-        lines += [
-            tr(lang, "report.room_hours", room=n, hours=f"{h:.1f}") for n, h in self.room_hours.items()
-        ] or [tr(lang, "report.no_data")]
-        lines += ["", tr(lang, "report.issues")]
-        lines += [f"- {i}" for i in self.issues] or [tr(lang, "report.no_issues")]
-        if self.suggestions:
-            lines += ["", tr(lang, "report.suggestions"), *(f"- {s}" for s in self.suggestions)]
-        return "\n".join(lines)
-
-
-def build_report(
-    *,
+def gas_change_pct(
     gas_m3: float | None,
     temps: Sequence[float],
     last_gas_m3: float | None,
     last_temps: Sequence[float],
-    room_hours: Mapping[str, float],
-    issues: Sequence[str],
     base: float = DEFAULT_HDD_BASE,
-    suggestions: Sequence[str] = (),
-) -> Report:
-    return Report(
-        gas_m3=gas_m3,
-        hdd=heating_degree_days(temps, base),
-        m3_per_hdd=m3_per_hdd(gas_m3, temps, base),
-        last_year_m3_per_hdd=m3_per_hdd(last_gas_m3, last_temps, base),
-        room_hours=dict(room_hours),
-        issues=list(issues),
-        suggestions=list(suggestions),
-    )
+) -> float | None:
+    """Weather-corrected change in gas use against the same week last year."""
+    now, before = m3_per_hdd(gas_m3, temps, base), m3_per_hdd(last_gas_m3, last_temps, base)
+    if now is None or not before:
+        return None
+    return (now / before - 1) * 100
 
 
-def suggestion_lines(suggestions: Sequence[Suggestion], lang: str = DEFAULT_LANGUAGE) -> list[str]:
-    """One plain sentence per suggested schedule window."""
-    return [
-        tr(
-            lang, "report.suggestion",
-            room=s.room,
-            days=", ".join(weekday(lang, d) for d in s.days),
-            time=s.start.strftime("%H:%M"),
-            count=s.events,
+@dataclass(frozen=True)
+class Digest:
+    change_pct: float | None = None
+    actions: Sequence[str] = ()  # most valuable first
+    effects: Sequence[tuple[str, float, float]] = ()  # (Room, hours per week before, since)
+
+    @property
+    def worth_sending(self) -> bool:
+        return bool(self.actions or self.effects) or (
+            self.change_pct is not None and abs(self.change_pct) >= NOTABLE_CHANGE_PCT
         )
-        for s in suggestions
-    ]
 
+    def verdict(self, lang: str = DEFAULT_LANGUAGE) -> str | None:
+        if self.change_pct is None:
+            return None
+        pct = round(self.change_pct)
+        if pct == 0:
+            return tr(lang, "digest.same")
+        return tr(lang, "digest.less" if pct < 0 else "digest.more", pct=abs(pct))
 
-def alert_issues(
-    history: Sequence[tuple[datetime, Alert]],
-    active: Sequence[Alert],
-    since: datetime,
-    lang: str = DEFAULT_LANGUAGE,
-) -> list[str]:
-    """Report lines for alerts raised since `since` or still active, one per (code, room)."""
-    still_active = {(a.code, a.room) for a in active}
-    seen: dict[tuple[str, str | None], Alert] = {}
-    for at, alert in history:
-        if at >= since:
-            seen[(alert.code, alert.room)] = alert
-    for alert in active:
-        seen.setdefault((alert.code, alert.room), alert)
-    return [
-        alert_sentence(a, lang) + tr(lang, "report.still_active" if key in still_active else "report.resolved")
-        for key, a in seen.items()
-    ]
+    def format(self, lang: str = DEFAULT_LANGUAGE) -> str:
+        blocks = []
+        if verdict := self.verdict(lang):
+            blocks.append(verdict)
+        if self.actions:
+            top = [f"{i}. {a}" for i, a in enumerate(self.actions[:TOP_ACTIONS], 1)]
+            blocks.append("\n".join([tr(lang, "digest.actions"), *top]))
+        if self.effects:
+            blocks.append(
+                "\n".join(
+                    [
+                        tr(lang, "digest.effects"),
+                        *(
+                            tr(lang, "digest.effect", room=r, before=number(b, lang), after=number(a, lang))
+                            for r, b, a in self.effects
+                        ),
+                    ]
+                )
+            )
+        return "\n\n".join(blocks)
+
+    def short(self, lang: str = DEFAULT_LANGUAGE) -> str:
+        """One or two lines for a phone."""
+        parts = [v] if (v := self.verdict(lang)) else []
+        if self.actions:
+            parts.append(tr(lang, "digest.push_actions", count=len(self.actions[:TOP_ACTIONS])))
+        return " ".join(parts) or tr(lang, "digest.title")

@@ -1,4 +1,4 @@
-"""Thin HA glue for the weekly report: gather data, call report.py, notify.
+"""Thin HA glue for the weekly digest: gather data, call report.py, notify.
 
 Unit-tested logic lives in report.py. This file is only verified in a real HA.
 """
@@ -8,9 +8,19 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from .const import CONF_GAS_ENTITY, CONF_HDD_BASE, CONF_OUTDOOR_ENTITY, CONF_ROOMS, DOMAIN
-from .i18n import pick_language, tr
-from .report import DEFAULT_HDD_BASE, alert_issues, build_report, heated_hours, suggestion_lines
+from .advice_actions import advice_text, effects
+from .alerts_adapter import notify_service
+from .apply import call_service
+from .const import (
+    CONF_GAS_ENTITY,
+    CONF_GAS_PRICE,
+    CONF_HDD_BASE,
+    CONF_NOTIFY_TARGETS,
+    CONF_OUTDOOR_ENTITY,
+    DOMAIN,
+)
+from .i18n import tr
+from .report import DEFAULT_HDD_BASE, Digest, gas_change_pct
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -38,53 +48,14 @@ async def _gas_and_temps(hass, gas, outdoor, start, end):
     return (sum(changes) if changes else None), temps
 
 
-async def _room_hours_and_issues(hass, rooms, start, end):
-    from homeassistant.components.recorder import get_instance, history
-
-    from .dashboard import entity_id
-    from .rooms import is_manual, room_id
-
-    controlled = [r for r in rooms if not is_manual(r)]
-    # Heated hours from our own Room climate entities: hvac_action is "heating" while the Room
-    # calls the boiler, for any TRV and for floor-heating and open-radiator Rooms too.
-    climates = {r["name"]: entity_id("climate", room_id(r)) for r in controlled}
-    trvs = {r["name"]: r["trv_entity"] for r in controlled if r.get("trv_entity")}
-    if not climates:
-        return {}, []
-    # hvac_action is an attribute: attribute-only changes must be included, which
-    # state_changes_during_period leaves out (it only returns changes of the state itself).
-    found = await get_instance(hass).async_add_executor_job(
-        lambda: history.get_significant_states(
-            hass,
-            start,
-            end,
-            [*climates.values(), *trvs.values()],
-            significant_changes_only=False,
-        )
-    )
-
-    def states_of(entity: str) -> list:
-        return [s for s in found.get(entity, []) if not isinstance(s, dict)]
-
-    hours = {
-        name: heated_hours(
-            [(max(s.last_updated, start), s.attributes.get("hvac_action") == "heating") for s in states_of(entity)],
-            end,
-        )
-        for name, entity in climates.items()
-    }
-    issues = [
-        f"{name}: TRV was unavailable this week"
-        for name, entity in trvs.items()
-        if any(s.state == "unavailable" for s in states_of(entity))
-    ]
-    return hours, issues
-
-
 async def async_send_report(hass: HomeAssistant, entry: ConfigEntry) -> None:
     from homeassistant.util import dt as dt_util
 
-    lang = pick_language(hass.config.language)
+    shared = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
+    coordinator = shared.get("coordinator")
+    if coordinator is None:
+        return
+    lang = coordinator.lang
     opts = entry.options
     base = float(opts.get(CONF_HDD_BASE, DEFAULT_HDD_BASE))
     end = dt_util.now().replace(minute=0, second=0, microsecond=0)
@@ -93,31 +64,41 @@ async def async_send_report(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     this_gas, temps = await _gas_and_temps(hass, gas, outdoor, start, end)
     last_gas, last_temps = await _gas_and_temps(hass, gas, outdoor, start - YEAR_AGO, end - YEAR_AGO)
-    hours, issues = await _room_hours_and_issues(hass, opts.get(CONF_ROOMS, []), start, end)
-    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id, {}).get("coordinator")
-    suggestions: list[str] = []
-    if coordinator is not None:
-        suggestions = suggestion_lines(coordinator.controller.suggestions(dt_util.now()), lang)
-        notifier = coordinator.alerts.notifier
-        issues += alert_issues(notifier.history, notifier.active, start, lang)
-    if not gas:
-        issues.append(tr(lang, "report.no_gas_meter"))
-    if not outdoor:
-        issues.append(tr(lang, "report.no_outdoor"))
 
-    report = build_report(
-        gas_m3=this_gas, temps=temps, last_gas_m3=last_gas, last_temps=last_temps,
-        room_hours=hours, issues=issues, base=base, suggestions=suggestions,
+    # What one boiler hour costs, roughly: the gas meter also counts hot water and cooking.
+    advisor = coordinator.advisor
+    log = coordinator.controller.advice_log
+    hours = sum(m for d, m in log.boiler.items() if d >= start.date().isoformat()) / 60
+    price = opts.get(CONF_GAS_PRICE)
+    advisor.state.cost_per_hour = this_gas / hours * float(price) if price and this_gas and hours >= 1 else None
+    advisor.state.currency = hass.config.currency
+    await advisor.async_refresh()
+
+    digest = Digest(
+        change_pct=gas_change_pct(this_gas, temps, last_gas, last_temps, base),
+        actions=[
+            advice_text(a, lang, advisor.state.cost_per_hour, advisor.names(), advisor.state.currency)
+            for a in advisor.current
+        ],
+        effects=effects(advisor.state, log, dt_util.now()),
     )
-    await hass.services.async_call(
+    if not digest.worth_sending:
+        return
+    await call_service(
+        hass,
         "persistent_notification",
         "create",
         {
-            "title": tr(lang, "report.title"),
-            "message": report.format(lang),
+            "title": tr(lang, "digest.title"),
+            "message": digest.format(lang),
             "notification_id": f"smart_heating_report_{entry.entry_id}",
         },
     )
+    for target in opts.get(CONF_NOTIFY_TARGETS, []):
+        if service := notify_service(target):
+            await call_service(
+                hass, "notify", service, {"title": tr(lang, "digest.title"), "message": digest.short(lang)}
+            )
 
 
 def schedule_weekly_report(hass: HomeAssistant, entry: ConfigEntry):

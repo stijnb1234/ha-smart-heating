@@ -53,3 +53,7 @@ set_vacation:
 cancel_vacation:
 
 cancel_boiler_hold:
+
+undo_advice:
+
+send_digest:

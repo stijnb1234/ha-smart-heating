@@ -1,6 +1,6 @@
 # Release D: Digest replaces the weekly report
 
-Status: ready-for-agent
+Status: resolved
 Order: 6 of 6
 Blocked by: savings advice
 

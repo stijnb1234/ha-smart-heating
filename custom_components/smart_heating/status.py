@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
-from .engine import Alert, Decision, EngineConfig, EngineInput
+from .engine import Decision, EngineConfig, EngineInput
 from .engine.boiler import backoff_delay
 from .engine.overrides import manual_override_active
 from .i18n import DEFAULT_LANGUAGE, tr, weekday
@@ -121,18 +121,6 @@ def status_text(
     return " ".join(parts)
 
 
-def alert_sentence(alert: Alert, lang: str = DEFAULT_LANGUAGE) -> str:
-    room = alert.room or tr(lang, "alert.a_room")
-    key = f"alert.{alert.code}"
-    if key in _ALERT_KEYS:
-        return tr(lang, key, room=room)
-    return alert.message or alert.code
-
-
-_ALERT_KEYS = {
-    f"alert.{c}"
-    for c in (
-        "boiler_outage", "trv_offline", "trv_off", "trv_write_failed",
-        "low_battery", "sensor_stale", "target_not_reached", "not_warming",
-    )
-}
+def diagnosis_sentence(cause: str, room: str | None, lang: str = DEFAULT_LANGUAGE) -> str:
+    """Likely cause and what to do, in plain words."""
+    return tr(lang, f"diagnosis.{cause}", room=room or tr(lang, "alert.a_room"))

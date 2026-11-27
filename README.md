@@ -43,8 +43,9 @@ Smart Heating sets each room's target temperature from a schedule, presence, Boo
 ### Control and insight
 
 - **Boost** buttons and service, and a **Manual-room override** that calls the boiler for rooms with ordinary valves.
-- **Alerts** for TRV offline or switched off, a TRV not accepting its setpoint, low battery, a room that does not warm up, a boiler thermostat that is unreachable and stale sensors. Shown under the bell, and optionally pushed to your phone after a delay, with a message when resolved.
-- **Weekly gas report** every Monday: m³ per heating-degree-day versus last year, hours each room called the boiler, open issues.
+- **One diagnosis per room** with a likely cause and what to do, on the dashboard. Only urgent problems (boiler thermostat unreachable, frost risk) interrupt: under the bell and, optionally, on your phone.
+- **Advice** from four weeks of local observations, under Settings → Repairs: radiators that heat while they should be closed, a room that keeps the boiler on by itself, pre-heat that is too long or late, problems that keep coming back, and schedule or occupant changes you can apply, snooze, ignore or undo. Nothing is changed by itself.
+- **Weekly digest** on Monday, only when there is something to say: gas use against last year corrected for the weather, the top three pieces of advice and what applied advice saved.
 - A generated **dashboard** with a plain-language overview, a page per room, a boiler page and help.
 - **English and Dutch**, following Home Assistant's language.
 - **Rename rooms freely**: each room has a stable id, so entities, history and learned data survive.
@@ -56,7 +57,7 @@ Not controlled: the floor loops themselves (floor heating only calls the boiler)
 - Home Assistant **2025.1 or newer**. The built-in Marketplace needs 2026.11; on older versions install through HACS.
 - Smart TRVs as `climate.*` entities. For the external room temperature: a number entity on the valve's device, or Zigbee2MQTT with the MQTT integration.
 - A boiler thermostat as a `climate.*` entity (optional: without it no boiler call is made).
-- Optional: `person.*` entities and the Home Assistant app with location (presence), a calendar entity (vacations), a gas meter and an outdoor temperature sensor with long-term statistics (weekly report).
+- Optional: `person.*` entities and the Home Assistant app with location (presence), a calendar entity (vacations), a gas meter and an outdoor temperature sensor with long-term statistics (weekly digest).
 
 ## Installation
 
@@ -97,8 +98,8 @@ Everything is configured in the UI under **Settings → Devices & services → S
 |---|---|
 | Add / edit / remove a room | Name, TRV entity, optional external sensor, comfort / setback / frost-hold, schedule, offset, lead time, window detection, occupants. Rooms flagged *manual* have no TRV; *floor heating* and *open radiator* rooms need a sensor. |
 | Boiler, presence and vacation | Boiler thermostat, tracked persons, heading-home detection, vacation calendar and keywords, boiler low / high setpoints, Boost and override durations, bedroom pre-bed window. |
-| Boiler call and alert thresholds | Debounce, backoff, demand hysteresis, alert thresholds, battery %, notify services for alerts and their delay, Zigbee2MQTT base topic. |
-| Gas report settings | Gas meter entity, outdoor sensor, heating-degree-day base (default 18 °C). |
+| Boiler call and alert thresholds | Debounce, backoff, demand hysteresis, alert thresholds, battery %, notify services for urgent alerts and the digest, Zigbee2MQTT base topic. |
+| Digest and gas settings | Gas meter entity, gas price (optional, for savings in money), outdoor sensor, heating-degree-day base (default 18 °C). |
 
 Schedule text: one comfort window per line.
 
@@ -119,6 +120,12 @@ A room without a room sensor takes its temperature from the radiator valve, whic
 3. Do this once with a cold radiator and once while it heats. A notification asks for the missing one. Entries are accepted only when the radiator has been clearly cold or hot for a while.
 
 The correction applies once both states are known; later entries refine it (the median of the last five per state). The valve setpoint is raised to match, unless setpoint correction is off for the room. `smart_heating.clear_calibration` starts over.
+
+## Advice
+
+Advice appears under **Settings → Repairs** (administrators), and read-only on the dashboard. A schedule or occupant proposal has **Apply this change**; every item can be put off for four weeks, or ignored for good with Home Assistant's *Ignore*. Undo the last applied change within four weeks with the *Undo last advice change* button or the `smart_heating.undo_advice` action. `smart_heating.send_digest` sends the digest right away.
+
+Pattern advice needs data: weekly totals after 7 days, schedule patterns after three weeks. Savings are estimates ("up to"): the gas meter also counts hot water and cooking, and one boiler serves every room. Presence already lowers rooms whose people are away, so a shorter schedule mainly saves pre-heat. A room without a room sensor only gets valve advice.
 
 ## Dashboard
 
@@ -148,7 +155,7 @@ lovelace:
 
 Per room (`<domain>.smart_heating_<room id>[_<key>]`): a read-only `climate` (its action is *heating* only while the room calls the boiler), sensors for *reason*, *summary*, *next change* and *lead time*, and Boost and cancel-boost buttons.
 
-System-wide: a Vacation `switch` and return `datetime`, Manual-room override buttons, `sensor.smart_heating_status`, `sensor.smart_heating_active_alerts`, `binary_sensor.smart_heating_boiler_call` and `sensor.smart_heating_boiler_*`.
+System-wide: a Vacation `switch` and return `datetime`, Manual-room override buttons, `sensor.smart_heating_status`, `sensor.smart_heating_active_alerts`, `sensor.smart_heating_advice`, `binary_sensor.smart_heating_boiler_call` and `sensor.smart_heating_boiler_*`.
 
 ## Services
 

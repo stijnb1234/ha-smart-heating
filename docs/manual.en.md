@@ -48,7 +48,7 @@ Then follows a table with one line per room:
 
 ### Alerts
 
-This block only appears when something needs attention, for example a nearly empty battery. If you don't see it, everything is fine. If the administrator has set it up, alerts that last a while also arrive on your phone, followed by a message once they are solved. Each alert is a plain sentence; further on in this manual you can read what to do about it.
+This block only appears when something needs attention, for example a nearly empty battery. If you don't see it, everything is fine. Each room has at most one line, saying what is probably wrong and what to do. Only urgent problems (the boiler cannot be reached, or a room risks freezing) also arrive on your phone, if the administrator has set that up. Below it, **Advice** lists ideas to save gas.
 
 ### Controls
 
@@ -128,7 +128,7 @@ These things happen automatically. You don't need to do anything.
 - **Rooms without smart valves yet:** these rooms ask for heat when they are cold and stop the boiler once they are warm enough. See [Rooms without smart valves](#rooms-without-smart-valves).
 - **A room that doesn't warm up:** if a room has been asking for heat for three quarters of an hour and has barely become any warmer (or after two hours is warming so slowly that it would take more than six hours to get warm), you get an alert and that room stops asking for heat for three hours, after which it tries again (floor heating first gets three hours). See [Alerts](#alerts-1).
 - **Valve switched off:** if a smart radiator valve is switched off, the system switches it back on.
-- **Weekly report:** every Monday at 08:00 you get a notification in Home Assistant (under the bell). It shows how much gas was used compared to last year, taking into account how cold it was, how many hours each room was heated, and whether there were any problems. If the system noticed a habit of yours, the report also contains a suggestion for the schedule.
+- **Advice and weekly message:** the system watches for patterns that waste gas. Every Monday at 08:00, only if there is something worth saying, you get a short message (under the bell): whether you used more or less gas than last year, taking the weather into account, up to three things you can do, and what earlier changes saved. See [Advice](#advice).
 
 ## Rooms without smart valves
 
@@ -165,7 +165,7 @@ Smart Heating starts with sensible standard values and then gets to know every r
 - **What counts as an open window.** Every room cools down a little differently: a room with a big window drops faster than a small bedroom. After about three hours of quiet readings, the system knows what is normal for a room and what is not. A room that normally barely changes recognises an open window sooner. The administrator's setting for the temperature drop is the maximum: the system can make the room more alert than that, never less.
 - **How far a room keeps warming up.** A radiator stays warm for a while after the boiler stops. The system measures how much further the room warms up, and switches the boiler off that much earlier. So the room comes to rest at its target instead of a bit above it, which saves gas. This takes at least three rounds of heating to learn, and the correction is never more than one degree.
 - **How the thermometers differ.** The thermometer in a radiator valve reads a different value than the separate thermometer in the middle of the room. The system compares the two while the radiator is off. If the separate thermometer ever goes quiet, it uses the valve's reading corrected by that difference, instead of being a bit off. If the administrator has set a correction by hand, that one is used.
-- **What you do by hand.** If you regularly press **Boost** or turn a valve up around the same time, outside the schedule, the system notices. When that has happened on at least three different days within four weeks, the Monday report says so, for example *you often ask for heat on Tue, Thu around 07:10, consider adding that to the schedule*. The system never changes the schedule by itself, that is up to you or the administrator.
+- **What you do by hand.** If you regularly press **Boost** or turn a valve up around the same time, outside the schedule, the system notices. When that has happened on at least three different days within four weeks, it proposes adding that time to the schedule (see [Advice](#advice)). The system never changes the schedule by itself.
 
 ## The buttons
 
@@ -199,18 +199,29 @@ The boiler then keeps firing for two hours. Done earlier? Press **Cancel manual 
 
 ## Alerts
 
-An alert only appears when something really needs attention. It disappears by itself once the problem is solved. Alerts mention the room by name; below it says *the room*.
+A line only appears when something really needs attention. It disappears by itself once the problem is solved. Several symptoms of one room are combined into the most likely cause; below, *the room* stands for its name.
 
-| Alert | What you can do |
+| Problem | What you can do |
 | --- | --- |
-| The battery of the radiator valve in the room is low. Replace it soon. | Replace the batteries soon. The valve keeps working until then. |
-| The radiator valve in the room is not responding. | Check whether the battery is empty or the valve has come loose. If that doesn't help, let the administrator know. |
-| The radiator valve in the room is switched off and does not turn back on. | The system tried to switch the valve on but could not. Check the valve itself or let the administrator know. |
-| The radiator valve in the room does not accept its temperature. | The valve was sent a temperature a few times but did not take it. New batteries often help. |
-| The temperature sensor in the room stopped reporting. | The separate thermometer in that room has gone quiet. Check whether its battery is empty. Until then the system uses the thermometer in the radiator valve. |
-| The room keeps asking for heat but is barely warming up. | A window may be open, or the radiator is not working. Check both. Until the room warms up, it only gets the boiler going once every few hours (a Boost tries again right away). |
-| The room has been too cold for a long time and is not reaching its target. | Check whether a window or door is open and whether the radiator gets warm. If it stays this way, let the administrator know. |
-| The boiler thermostat cannot be reached. | The boiler cannot be controlled reliably for now. The radiator valves keep following the schedule. This usually sorts itself out. |
+| Frost risk: the room is close to freezing protection and not warming up. **Urgent** | Close windows and doors, open the radiator valve and check that the radiator gets warm. |
+| The boiler thermostat cannot be reached. **Urgent** | Check that it has power and a connection. The radiator valves keep following the schedule. |
+| The radiator valve is not responding. | Replace the batteries. If that doesn't help, let the administrator know. |
+| The radiator valve stays switched off. | Check the valve for a child lock or error and replace the batteries. |
+| The radiator valve does not accept its temperature. | New batteries often help; otherwise it needs remounting or replacing. |
+| The room asks for heat but stays cold. | Check for an open window, and whether the radiator gets warm and is not covered. Until the room warms up, it only gets the boiler going once every few hours (a Boost tries again right away). |
+| The room stays too cold. | Check windows, doors and the radiator. If it stays this way, let the administrator know. |
+| The battery of the radiator valve is low. | Replace the batteries soon. |
+| The temperature sensor stopped reporting. | Check its battery. Until then the thermometer in the radiator valve is used. |
+
+## Advice
+
+Advice is about patterns over days or weeks, such as a radiator that heats while it should be closed, one room keeping the boiler on by itself, or a warm period that is often for nobody. The administrator finds it under **Settings → Repairs** and decides what happens:
+
+- **Apply this change** (only for schedule and room-people proposals).
+- **Remind me in four weeks**, or *Ignore* to never see it again.
+- **Undo last advice change** puts the previous settings back, within four weeks.
+
+It takes one to three weeks of data before most advice can appear.
 
 ## Changing things yourself
 
@@ -238,7 +249,7 @@ The room suddenly cooled down quickly, for example because a door was open. Afte
 Probably because a room with open radiators (a room without smart valves) is already warm enough. As long as that room is at its comfort temperature, the boiler stays off for the whole house, so nothing gets too warm. See [Rooms without smart valves](#rooms-without-smart-valves). In a hurry? Use the **Manual room override**.
 
 **Does the system change my schedule by itself?**
-No. It learns how your house behaves, and can suggest a schedule time in the Monday report, but it never changes the schedule itself.
+No. It learns how your house behaves and can propose a change, but nothing changes until the administrator applies it.
 
 **How long before it has learned my house?**
 The first things, such as an open window, work after a few hours. Warming up on time and switching the boiler off in time get better over the first few weeks. Until then the standard values apply, so you aren't worse off.

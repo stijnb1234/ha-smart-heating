@@ -1,6 +1,6 @@
 # Release C: Advice in Home Assistant Repairs
 
-Status: ready-for-agent
+Status: resolved
 Order: 5 of 6
 Decision: docs/adr/0008-local-advice-in-repairs.md
 
@@ -40,3 +40,10 @@ a gas meter and the new optional gas price setting.
   dialog; dismiss is the Repairs ignore.
 - A button and an action undo the last applied advice; kept 4 weeks.
 - Detection is pure engine code, tested with a fake clock. Texts in en and nl.
+
+## Comments
+
+Implemented. Presence already lowers rooms whose people are away, so a schedule trim saves the
+pre-heat before an unused start and the days the evidence did not cover; the estimate counts only
+boiler time the Room alone caused. Occupants are suggested when a hand-lowered valve coincides with
+the same person being away. A diagnosis recurs when seen on 3 different days.

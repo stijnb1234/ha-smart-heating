@@ -19,7 +19,7 @@
           "edit_room": "Edit a room",
           "remove_room": "Remove a room",
           "heating_settings": "Boiler, presence and vacation",
-          "report_settings": "Gas report settings",
+          "report_settings": "Digest and gas settings",
           "save": "Save and close",
           "advanced_settings": "Boiler call and alert thresholds"
         }
@@ -43,12 +43,13 @@
         }
       },
       "report_settings": {
-        "title": "Gas report settings",
-        "description": "Weekly report on Mondays. Compares m3 per heating-degree-day with the same week last year (needs recorder long-term statistics for both entities).",
+        "title": "Digest and gas settings",
+        "description": "Used for the weekly digest and to estimate savings. All optional.",
         "data": {
           "gas_entity": "Gas meter (m3, total increasing)",
           "outdoor_entity": "Outdoor temperature sensor",
-          "hdd_base": "Heating-degree-day base temperature"
+          "hdd_base": "Heating-degree-day base temperature",
+          "gas_price": "Gas price per m³ (for rough savings in money)"
         }
       },
       "add_room": {
@@ -131,8 +132,7 @@
           "outage_after_failures": "Boiler thermostat outage after failed writes",
           "sensor_stale_hours": "External sensor stale after",
           "battery_low_percent": "Low battery below",
-          "notify_targets": "Also send alerts to (notify services, e.g. your phone's mobile app)",
-          "notify_delay_minutes": "Send to those only after an alert has lasted",
+          "notify_targets": "Send urgent alerts and the weekly digest also to (notify services, e.g. your phone's app)",
           "z2m_base_topic": "Zigbee2MQTT base topic (for TRVs that get the room temperature over MQTT)"
         }
       }
@@ -201,6 +201,14 @@
     "cancel_boiler_hold": {
       "name": "End boiler thermostat manual change",
       "description": "Stop respecting a setpoint changed by hand on the boiler thermostat now, so Smart Heating controls the boiler again."
+    },
+    "undo_advice": {
+      "name": "Undo last advice change",
+      "description": "Put back the settings changed by the most recently applied advice (kept four weeks)."
+    },
+    "send_digest": {
+      "name": "Send the digest now",
+      "description": "Send the weekly digest now, if there is something worth saying."
     }
   },
   "exceptions": {
@@ -224,6 +232,56 @@
     },
     "calibration_implausible": {
       "message": "This reading differs too much from the radiator valve. Check the value."
+    },
+    "advice_gone": {
+      "message": "This advice no longer applies."
+    },
+    "nothing_to_undo": {
+      "message": "There is no advice change to undo."
+    }
+  },
+  "issues": {
+    "advice": {
+      "title": "{title}",
+      "fix_flow": {
+        "abort": {
+          "advice_gone": "This advice no longer applies."
+        },
+        "step": {
+          "init": {
+            "title": "{title}",
+            "description": "{text}",
+            "menu_options": {
+              "snooze": "Remind me in four weeks"
+            }
+          }
+        }
+      }
+    },
+    "advice_apply": {
+      "title": "{title}",
+      "fix_flow": {
+        "abort": {
+          "advice_gone": "This advice no longer applies."
+        },
+        "step": {
+          "init": {
+            "title": "{title}",
+            "description": "{text}",
+            "menu_options": {
+              "apply": "Apply this change",
+              "snooze": "Remind me in four weeks"
+            }
+          },
+          "apply": {
+            "title": "{title}",
+            "description": "{text}",
+            "data": {
+              "people": "People of this room"
+            }
+          }
+        }
+      }
     }
   }
 }

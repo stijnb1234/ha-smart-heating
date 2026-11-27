@@ -207,6 +207,8 @@ class EngineInput:
     calibrated: Mapping[str, Offset] = field(default_factory=dict)
     # Rooms that have called for heat for a long time without warming up.
     stalled: frozenset[str] = frozenset()
+    # Rooms near frost-hold that are not warming up.
+    frost_risk: frozenset[str] = frozenset()
     # Stalled Rooms that do not call for heat until their next try (see StallTracker).
     resting: frozenset[str] = frozenset()
     # Rooms whose TRV takes no external temperature (its setpoint may be corrected instead).

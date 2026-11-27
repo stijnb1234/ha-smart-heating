@@ -103,6 +103,22 @@ class CancelBoilerHoldButton(ButtonEntity):
         await end_boiler_hold(self._state)
 
 
+class UndoAdviceButton(ButtonEntity):
+    """Puts back what the last applied advice changed. A config entity: kept off dashboards."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+    entity_id = "button.smart_heating_undo_advice"
+
+    def __init__(self, entry_id: str, state: dict) -> None:
+        self._state = state
+        self._attr_name = tr(state["lang"], "entity.undo_advice")
+        self._attr_unique_id = f"{entry_id}_undo_advice"
+
+    async def async_press(self) -> None:
+        await self._state["coordinator"].advisor.async_undo()
+
+
 async def end_boiler_hold(state: dict) -> None:
     """End a manual hold on the boiler thermostat now (button and service); no-op without one."""
     coordinator = state.get("coordinator")
@@ -139,4 +155,5 @@ async def async_setup_entry(
     entities.append(ManualRoomOverrideButton(entry.entry_id, state))
     entities.append(CancelManualRoomOverrideButton(entry.entry_id, state))
     entities.append(CancelBoilerHoldButton(entry.entry_id, state))
+    entities.append(UndoAdviceButton(entry.entry_id, state))
     async_add_entities(entities)

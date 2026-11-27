@@ -1,8 +1,9 @@
-from datetime import timedelta
+from datetime import time, timedelta
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 
 from custom_components.smart_heating.const import DOMAIN
@@ -129,20 +130,24 @@ async def test_unload_flushes_learned_data_and_diagnostics_work(hass):
     assert data["coasts"] == {"bed": [0.3]}
 
 
-async def test_alerts_are_pushed_to_configured_notify_services(hass):
+async def test_only_urgent_problems_are_pushed(hass):
     from pytest_homeassistant_custom_component.common import async_mock_service
 
     from .conftest import OPTIONS
 
     sent = async_mock_service(hass, "notify", "phone")
-    set_home(hass)
-    hass.states.async_set("sensor.bed_trv_battery", "8")  # low battery alert
-    await setup_entry(hass, {**OPTIONS, "notify_targets": ["notify.phone"], "notify_delay_minutes": 0})
-    assert [c.data["message"] for c in sent] == ["The battery of the radiator valve in Bedroom is low. Replace it soon."]
+    set_home(hass, bed_temp=12.5)
+    hass.states.async_set("sensor.bed_trv_battery", "8")  # low battery: dashboard only
+    await setup_entry(hass, {**OPTIONS, "notify_targets": ["notify.phone"]})
+    assert sent == []
+    assert hass.states.get("sensor.smart_heating_active_alerts").state == "1"
 
-    hass.states.async_set("sensor.bed_trv_battery", "90")
-    await hass.data[DOMAIN]["e1"]["coordinator"].async_refresh()
-    assert sent[-1].data["message"].startswith("Resolved: ")
+    coordinator = hass.data[DOMAIN]["e1"]["coordinator"]
+    frost = coordinator.controller._frost
+    frost._since["Bedroom"] = (dt_util.now() - timedelta(hours=2), 12.5)
+    await coordinator.async_refresh()
+    await coordinator.async_refresh()
+    assert [c.data["message"].split()[0] for c in sent] == ["Bedroom"]
 
 
 async def test_options_flow_saves_notify_and_correction_settings(hass):
@@ -152,11 +157,11 @@ async def test_options_flow_saves_notify_and_correction_settings(hass):
     flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "advanced_settings"})
     assert flow["step_id"] == "advanced_settings"
     flow = await hass.config_entries.options.async_configure(
-        flow["flow_id"], {"notify_targets": ["notify.phone"], "notify_delay_minutes": 30}
+        flow["flow_id"], {"notify_targets": ["notify.phone"]}
     )
     flow = await hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "save"})
     assert flow["type"] == "create_entry"
-    assert entry.options["notify_targets"] == ["notify.phone"] and entry.options["notify_delay_minutes"] == 30
+    assert entry.options["notify_targets"] == ["notify.phone"]
 
 
 async def test_cancel_boiler_hold_service_and_button(hass):
@@ -226,3 +231,42 @@ async def test_calibration_is_refused_for_a_room_with_a_sensor(hass):
         await hass.services.async_call(
             DOMAIN, "calibrate", {"entity_id": "climate.smart_heating_bed", "temperature": 17.5}, blocking=True
         )
+
+
+async def test_advice_appears_in_repairs_and_can_be_applied_and_undone(hass):
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.smart_heating.engine.insights import Suggestion
+
+    set_home(hass, bed_temp=21.0)
+    rooms = [{**ROOMS[0], "schedule": [{"days": [0], "start": "09:00", "end": "17:00"}]}]
+    from .conftest import OPTIONS
+
+    entry = await setup_entry(hass, {**OPTIONS, "rooms": rooms})
+    coordinator = hass.data[DOMAIN]["e1"]["coordinator"]
+    coordinator.controller.suggestions = lambda now: [Suggestion("Bedroom", (2,), time(7), 3)]
+    await coordinator.advisor.async_refresh()
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "advice_add_time_bed_0700")
+    assert issue is not None and issue.is_fixable and "Bedroom" in issue.translation_placeholders["text"]
+
+    # The digest runs end to end (no gas meter: just the advice).
+    from pytest_homeassistant_custom_component.common import async_mock_service
+
+    bell = async_mock_service(hass, "persistent_notification", "create")
+    await hass.services.async_call(DOMAIN, "send_digest", {}, blocking=True)
+    assert "Bedroom" in bell[-1].data["message"]
+
+    # Through Home Assistant's own Repairs flow, as the dialog does it.
+    assert await async_setup_component(hass, "repairs", {})
+    await hass.async_block_till_done()
+    flows = hass.data["repairs"]["flow_manager"]
+    menu = await flows.async_init(DOMAIN, data={"issue_id": issue.issue_id})
+    assert menu["menu_options"] == ["apply", "snooze"]
+    done = await flows.async_configure(menu["flow_id"], {"next_step_id": "apply"})
+    assert done["type"] == "create_entry"
+    await hass.async_block_till_done()
+    assert {"days": [2], "start": "07:00", "end": "08:00"} in entry.options["rooms"][0]["schedule"]
+
+    await hass.services.async_call(DOMAIN, "undo_advice", {}, blocking=True)
+    await hass.async_block_till_done()
+    assert entry.options["rooms"][0]["schedule"] == rooms[0]["schedule"]

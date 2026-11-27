@@ -101,9 +101,9 @@ Room at frost-hold for a while. While a radiator is hot or **cooling down** afte
 own sensor falls anyway, so only the external room sensor is trusted then.
 
 **Schedule suggestion**: A recurring Boost or hand-set valve at a time the schedule does not cover,
-reported weekly. The schedule is never changed by itself.
+offered as Advice to add it.
 
-## Advice (planned, see `.scratch/`)
+## Advice
 
 **Advice**: A recurring pattern that wastes gas or comfort, with how to solve it, offered to the
 administrator. Applied only on request, and can be snoozed, dismissed or undone.
@@ -116,4 +116,5 @@ for a cold and a heating radiator.
 **Digest**: The weekly message with a gas verdict, the top Advice and the effect of applied Advice.
 It replaces the weekly report.
 
-**Frost risk**: A Room close to frost-hold that is not warming.
+**Frost risk**: A Room within 1 K of frost-hold that has not warmed for an hour. With an unreachable
+boiler thermostat the only urgent Diagnosis: the only ones that notify.

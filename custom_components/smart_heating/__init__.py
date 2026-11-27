@@ -32,6 +32,8 @@ PLATFORMS = ["binary_sensor", "button", "climate", "datetime", "number", "sensor
 SERVICE_SET_VACATION = "set_vacation"
 SERVICE_CANCEL_VACATION = "cancel_vacation"
 SERVICE_CANCEL_BOILER_HOLD = "cancel_boiler_hold"
+SERVICE_UNDO_ADVICE = "undo_advice"
+SERVICE_SEND_DIGEST = "send_digest"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -72,6 +74,18 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     async def cancel_boiler_hold(call: ServiceCall) -> None:
         await end_boiler_hold(_shared())
 
+    async def undo_advice(call: ServiceCall) -> None:
+        await _shared()["coordinator"].advisor.async_undo()
+
+    async def send_digest(call: ServiceCall) -> None:
+        from .report_glue import async_send_report
+
+        _shared()
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            await async_send_report(hass, entry)
+
+    hass.services.async_register(DOMAIN, SERVICE_UNDO_ADVICE, undo_advice, vol.Schema({}))
+    hass.services.async_register(DOMAIN, SERVICE_SEND_DIGEST, send_digest, vol.Schema({}))
     hass.services.async_register(DOMAIN, SERVICE_CANCEL_VACATION, cancel_vacation, vol.Schema({}))
     hass.services.async_register(DOMAIN, SERVICE_CANCEL_BOILER_HOLD, cancel_boiler_hold, vol.Schema({}))
     return True
@@ -132,6 +146,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from homeassistant.util import dt as dt_util
 
     from . import dashboard_panel
+    from .advice_store import AdviceStore
     from .calibration_store import CalibrationStore
     from .commands_store import CommandsStore
     from .coordinator import Persistence, SmartHeatingCoordinator
@@ -165,6 +180,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     learner_store, insights_store = LearnerStore(hass, keys), InsightsStore(hass, keys)
     commands_store = CommandsStore(hass, keys)
     calibration_store = CalibrationStore(hass, keys)
+    advice_store = AdviceStore(hass, keys)
+    advice_log, advice_state = await advice_store.async_load()
     restored, away_since = await commands_store.async_load([r["name"] for r in rooms])
     persistence = Persistence(
         learner_store=learner_store,
@@ -174,6 +191,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         insights=await insights_store.async_load(),
         calibration_store=calibration_store,
         calibration=await calibration_store.async_load(),
+        advice_store=advice_store,
+        advice_log=advice_log,
+        advice_state=advice_state,
         restored=restored,
         away_since=away_since,
     )

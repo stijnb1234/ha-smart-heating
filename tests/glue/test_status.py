@@ -1,7 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
 from custom_components.smart_heating.engine import (
-    Alert,
     Boost,
     Commands,
     EngineConfig,
@@ -13,10 +12,10 @@ from custom_components.smart_heating.engine import (
     decide,
 )
 from custom_components.smart_heating.status import (
-    alert_sentence,
     backoff_text,
     boiler_status,
     demand_text,
+    diagnosis_sentence,
     heating_rooms,
     hold_text,
     status_text,
@@ -43,15 +42,10 @@ def make(temps, commands=None, last_write=None, boosts=None, overrides=None):
     return inp, decide(inp)
 
 
-def test_alert_sentences_are_plain_language():
-    assert "Work room" in alert_sentence(Alert("trv_offline", "Work room"))
-    assert "battery" in alert_sentence(Alert("low_battery", "Hall"))
-    assert "Hall" in alert_sentence(Alert("sensor_stale", "Hall"))
-    assert "Hall" in alert_sentence(Alert("target_not_reached", "Hall"))
-    assert "thermostat" in alert_sentence(Alert("boiler_outage"))
-    assert alert_sentence(Alert("weird", None, "raw message")) == "raw message"
-    assert alert_sentence(Alert("weird")) == "weird"
-
+def test_diagnosis_sentences_are_plain_language():
+    assert "Work room" in diagnosis_sentence("valve_unreachable", "Work room")
+    assert "battery" in diagnosis_sentence("battery", "Hall")
+    assert "thermostat" in diagnosis_sentence("boiler_outage", None)
 
 def test_heating_rooms_are_those_clearly_below_target():
     inp, d = make({"Work room": 18.0, "Hall": 19.9}, boosts=["Work room", "Hall"])

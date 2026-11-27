@@ -19,7 +19,7 @@
           "edit_room": "Ruimte bewerken",
           "remove_room": "Ruimte verwijderen",
           "heating_settings": "Boiler, aanwezigheid en vakantie",
-          "report_settings": "Gasrapport-instellingen",
+          "report_settings": "Weekoverzicht en gas",
           "save": "Opslaan en sluiten",
           "advanced_settings": "Boileraanvraag en meldingsdrempels"
         }
@@ -43,12 +43,13 @@
         }
       },
       "report_settings": {
-        "title": "Gasrapport-instellingen",
-        "description": "Wekelijks rapport op maandag. Vergelijkt m3 per graaddag met dezelfde week vorig jaar (vereist langetermijnstatistieken van de recorder voor beide entiteiten).",
+        "title": "Weekoverzicht en gas",
+        "description": "Voor het weekoverzicht en om besparingen te schatten. Alles is optioneel.",
         "data": {
           "gas_entity": "Gasmeter (m3, totaal oplopend)",
           "outdoor_entity": "Buitentemperatuursensor",
-          "hdd_base": "Basistemperatuur voor graaddagen"
+          "hdd_base": "Basistemperatuur voor graaddagen",
+          "gas_price": "Gasprijs per m³ (voor een ruwe besparing in geld)"
         }
       },
       "add_room": {
@@ -117,7 +118,7 @@
       },
       "advanced_settings": {
         "title": "Boileraanvraag en meldingsdrempels",
-        "description": "Vertraging en pauze bij schrijfacties naar de ketelthermostaat (cloudlimieten), hysterese van de warmtevraag, meldingsdrempels en het Zigbee2MQTT-basistopic. Meldingen kunnen ook naar je telefoon: ze gaan pas weg als ze de wachttijd duren, met een bericht als ze zijn opgelost.",
+        "description": "Vertraging en pauze bij schrijfacties naar de ketelthermostaat (cloudlimieten), hysterese van de warmtevraag, meldingsdrempels en het Zigbee2MQTT-basistopic. Dringende meldingen (ketel onbereikbaar, kans op bevriezing) en het weekoverzicht kunnen ook naar je telefoon.",
         "data": {
           "debounce_minutes": "Wachttijd na een wijziging van de ketelthermostaat",
           "backoff_base_minutes": "Eerste pauze na een mislukte schrijfactie",
@@ -131,8 +132,7 @@
           "outage_after_failures": "Storing ketelthermostaat na mislukte schrijfacties",
           "sensor_stale_hours": "Externe sensor verouderd na",
           "battery_low_percent": "Batterij laag onder",
-          "notify_targets": "Meldingen ook sturen naar (meldingsdiensten, bijv. de app op je telefoon)",
-          "notify_delay_minutes": "Daarheen pas sturen als een melding al zo lang duurt",
+          "notify_targets": "Dringende meldingen en weekoverzicht ook sturen naar (meldingsdiensten, bijv. de app op je telefoon)",
           "z2m_base_topic": "Zigbee2MQTT-basistopic (voor kranen die de kamertemperatuur via MQTT krijgen)"
         }
       }
@@ -201,6 +201,14 @@
     "cancel_boiler_hold": {
       "name": "Handmatige wijziging ketelthermostaat beëindigen",
       "description": "Respecteer een met de hand ingestelde temperatuur op de ketelthermostaat niet langer, zodat Smart Heating de ketel weer aanstuurt."
+    },
+    "undo_advice": {
+      "name": "Laatste adviesaanpassing ongedaan maken",
+      "description": "Zet de instellingen van het laatst toegepaste advies terug (vier weken bewaard)."
+    },
+    "send_digest": {
+      "name": "Overzicht nu versturen",
+      "description": "Verstuur het weekoverzicht nu, als er iets te melden is."
     }
   },
   "exceptions": {
@@ -224,6 +232,56 @@
     },
     "calibration_implausible": {
       "message": "Deze waarde wijkt te veel af van de radiatorkraan. Controleer de waarde."
+    },
+    "advice_gone": {
+      "message": "Dit advies is niet meer van toepassing."
+    },
+    "nothing_to_undo": {
+      "message": "Er is geen adviesaanpassing om ongedaan te maken."
+    }
+  },
+  "issues": {
+    "advice": {
+      "title": "{title}",
+      "fix_flow": {
+        "abort": {
+          "advice_gone": "Dit advies is niet meer van toepassing."
+        },
+        "step": {
+          "init": {
+            "title": "{title}",
+            "description": "{text}",
+            "menu_options": {
+              "snooze": "Herinner me over vier weken"
+            }
+          }
+        }
+      }
+    },
+    "advice_apply": {
+      "title": "{title}",
+      "fix_flow": {
+        "abort": {
+          "advice_gone": "Dit advies is niet meer van toepassing."
+        },
+        "step": {
+          "init": {
+            "title": "{title}",
+            "description": "{text}",
+            "menu_options": {
+              "apply": "Deze aanpassing toepassen",
+              "snooze": "Herinner me over vier weken"
+            }
+          },
+          "apply": {
+            "title": "{title}",
+            "description": "{text}",
+            "data": {
+              "people": "Personen van deze ruimte"
+            }
+          }
+        }
+      }
     }
   }
 }
